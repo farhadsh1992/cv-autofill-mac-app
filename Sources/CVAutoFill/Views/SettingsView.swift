@@ -24,7 +24,7 @@ struct SettingsView: View {
                     supportsOpacity: false
                 )
 
-                Picker("Window style", selection: $state.settings.buttonStyle) {
+                Picker("Button style", selection: $state.settings.buttonStyle) {
                     Text("Normal").tag(ButtonStyleChoice.normal)
                     Text("Glass").tag(ButtonStyleChoice.glass)
                 }
@@ -111,7 +111,7 @@ struct SettingsView: View {
 
     private var glassNote: String {
         if #available(macOS 26.0, *) {
-            return "Glass applies macOS's Liquid Glass material to the whole window and every button."
+            return "Glass uses macOS's Liquid Glass button material. (The window's title bar already gets that look automatically from macOS 26 itself — that part isn't controlled by this app.)"
         } else {
             return "Glass needs macOS 26 (Tahoe) or later — this Mac will use the normal style regardless."
         }
