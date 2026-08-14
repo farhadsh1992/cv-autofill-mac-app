@@ -1,5 +1,13 @@
 import Foundation
 
+// Custom init(from:) everywhere below because the AI occasionally returns
+// JSON `null` for a field instead of "" / [] (despite the prompt asking for
+// the latter). A plain synthesized Decodable throws DecodingError.valueNotFound
+// for that — surfaced to the user as the wonderfully unhelpful "The data
+// couldn't be read because it is missing." decodeIfPresent(...) ?? default
+// treats a present-but-null value the same as a missing key: falls back
+// instead of throwing.
+
 struct WorkExperience: Codable, Equatable {
     var title: String = ""
     var company: String = ""
@@ -7,6 +15,18 @@ struct WorkExperience: Codable, Equatable {
     var end: String = ""
     var description: String = ""
     var bullets: [String] = []
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        company = try c.decodeIfPresent(String.self, forKey: .company) ?? ""
+        start = try c.decodeIfPresent(String.self, forKey: .start) ?? ""
+        end = try c.decodeIfPresent(String.self, forKey: .end) ?? ""
+        description = try c.decodeIfPresent(String.self, forKey: .description) ?? ""
+        bullets = try c.decodeIfPresent([String].self, forKey: .bullets) ?? []
+    }
 }
 
 struct Education: Codable, Equatable {
@@ -14,6 +34,16 @@ struct Education: Codable, Equatable {
     var institution: String = ""
     var start: String = ""
     var end: String = ""
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        degree = try c.decodeIfPresent(String.self, forKey: .degree) ?? ""
+        institution = try c.decodeIfPresent(String.self, forKey: .institution) ?? ""
+        start = try c.decodeIfPresent(String.self, forKey: .start) ?? ""
+        end = try c.decodeIfPresent(String.self, forKey: .end) ?? ""
+    }
 }
 
 struct CVData: Codable, Equatable {
@@ -28,6 +58,23 @@ struct CVData: Codable, Equatable {
     var work_experience: [WorkExperience] = []
     var education: [Education] = []
     var skills: [String] = []
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        full_name = try c.decodeIfPresent(String.self, forKey: .full_name) ?? ""
+        email = try c.decodeIfPresent(String.self, forKey: .email) ?? ""
+        phone = try c.decodeIfPresent(String.self, forKey: .phone) ?? ""
+        location = try c.decodeIfPresent(String.self, forKey: .location) ?? ""
+        linkedin = try c.decodeIfPresent(String.self, forKey: .linkedin) ?? ""
+        github = try c.decodeIfPresent(String.self, forKey: .github) ?? ""
+        portfolio = try c.decodeIfPresent(String.self, forKey: .portfolio) ?? ""
+        summary = try c.decodeIfPresent(String.self, forKey: .summary) ?? ""
+        work_experience = try c.decodeIfPresent([WorkExperience].self, forKey: .work_experience) ?? []
+        education = try c.decodeIfPresent([Education].self, forKey: .education) ?? []
+        skills = try c.decodeIfPresent([String].self, forKey: .skills) ?? []
+    }
 }
 
 struct ResourceItem: Codable, Identifiable, Equatable {
