@@ -5,7 +5,7 @@ context, and generating tailored application material with AI — OpenAI or
 Anthropic (Claude), your choice, per request. Built with SwiftUI and Swift
 Package Manager, no Xcode project file, no external dependencies.
 
-This is a **standalone companion** to the [browser extension](../cv_autofill_extension)
+This is a **standalone companion** to the [browser extension](https://github.com/farhadsh1992/cv-autofill-extension)
 of the same name — same idea, same visual identity, but its own separate
 local storage. The two don't share data (see "Extension vs. app" below for
 why, and how to move data between them manually if you want to).
@@ -97,11 +97,16 @@ open "dist/Farhad's CV AutoFill.app"
 
 Same flat-vector mark as the browser extension — CV document, sync badge,
 generic "TXT" badge, folder with an "F" monogram, in `#9E230B`. Source SVGs
-live in the extension repo's `icon-design/` folder
-(`icon_final_hero.svg` for the app icon and the sidebar logo,
-`icon_final_simple.svg` for the small macOS iconset sizes where the full
-mark gets muddy). `build_app.sh` pulls the compiled `AppIcon.icns` from
-there — the icon isn't duplicated in this repo, just referenced.
+live in the [extension repo](https://github.com/farhadsh1992/cv-autofill-extension)'s
+`icon-design/` folder (`icon_final_hero.svg` for the app icon and the
+sidebar logo, `icon_final_simple.svg` for the small macOS iconset sizes
+where the full mark gets muddy) — the icon isn't duplicated in this repo.
+
+**This means `build_app.sh` expects the extension repo checked out as a
+sibling directory** (`../cv_autofill_extension/icon-design/AppIcon.icns`,
+same layout as this project's original monorepo). If you only clone this
+repo on its own, the build still works, it just silently skips setting the
+app icon — clone `cv-autofill-extension` next to this folder to get it.
 
 ## Files
 
