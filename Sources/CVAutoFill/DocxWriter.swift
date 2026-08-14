@@ -110,37 +110,91 @@ enum DocxWriter {
         let text: String
         var bold: Bool = false
         var size: Int = 22
+        var color: String? = nil
     }
 
     private static func paragraph(_ runs: [Run], spacingAfter: Int? = nil) -> String {
         let pPr = spacingAfter.map { "<w:pPr><w:spacing w:after=\"\($0)\"/></w:pPr>" } ?? ""
         let runsXml = runs.filter { !$0.text.isEmpty }.map { r -> String in
-            let rPr = "<w:rPr>\(r.bold ? "<w:b/>" : "")<w:sz w:val=\"\(r.size)\"/></w:rPr>"
+            let colorXml = r.color.map { "<w:color w:val=\"\($0)\"/>" } ?? ""
+            let rPr = "<w:rPr>\(r.bold ? "<w:b/>" : "")\(colorXml)<w:sz w:val=\"\(r.size)\"/></w:rPr>"
             return "<w:r>\(rPr)<w:t xml:space=\"preserve\">\(xmlEscape(r.text))</w:t></w:r>"
         }.joined()
         return "<w:p>\(pPr)\(runsXml)</w:p>"
     }
 
-    static func generate(cv: CVData) -> Data {
-        var paragraphs: [String] = []
+    // A single inline photo paragraph referencing a relationship id already
+    // declared in word/_rels/document.xml.rels. sizeEmu ~ 914400 EMU = 1 inch.
+    private static func photoParagraph(relId: String, sizeEmu: Int, spacingAfter: Int) -> String {
+        let pPr = "<w:pPr><w:spacing w:after=\"\(spacingAfter)\"/></w:pPr>"
+        let drawing = """
+        <w:drawing>
+        <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+        <wp:extent cx="\(sizeEmu)" cy="\(sizeEmu)"/>
+        <wp:docPr id="1" name="Photo"/>
+        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+        <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+        <pic:nvPicPr><pic:cNvPr id="1" name="Photo"/><pic:cNvPicPr/></pic:nvPicPr>
+        <pic:blipFill>
+        <a:blip r:embed="\(relId)" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+        <a:stretch><a:fillRect/></a:stretch>
+        </pic:blipFill>
+        <pic:spPr>
+        <a:xfrm><a:off x="0" y="0"/><a:ext cx="\(sizeEmu)" cy="\(sizeEmu)"/></a:xfrm>
+        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </pic:spPr>
+        </pic:pic>
+        </a:graphicData>
+        </a:graphic>
+        </wp:inline>
+        </w:drawing>
+        """
+        return "<w:p>\(pPr)<w:r>\(drawing)</w:r></w:p>"
+    }
 
-        paragraphs.append(paragraph([Run(text: cv.full_name.isEmpty ? "Your Name" : cv.full_name, bold: true, size: 36)], spacingAfter: 60))
+    private static let imageContentType: [String: String] = [
+        "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "bmp": "image/bmp",
+    ]
+
+    /// style: optional, extracted from an uploaded .docx via DocxStyleExtractor.
+    /// Any part may be absent; the template falls back to plain black headings
+    /// and no photo.
+    static func generate(cv: CVData, style: DocxStyle? = nil) -> Data {
+        let accent = style?.accentColorHex?.replacingOccurrences(of: "#", with: "").uppercased()
+        func heading(_ text: String, size: Int = 26) -> [Run] { [Run(text: text, bold: true, size: size, color: accent)] }
+
+        var paragraphs: [String] = []
+        var mediaEntry: Entry?
+        var relsXml: String?
+
+        if let style, let photoData = style.photoData, let mime = style.photoMimeType,
+           let ext = imageContentType.first(where: { $0.value == mime })?.key {
+            mediaEntry = Entry(name: "word/media/image1.\(ext)", data: Array(photoData))
+            paragraphs.append(photoParagraph(relId: "rId100", sizeEmu: 1_080_000, spacingAfter: 120))
+            relsXml = """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId100" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.\(ext)"/></Relationships>
+            """
+        }
+
+        paragraphs.append(paragraph([Run(text: cv.full_name.isEmpty ? "Your Name" : cv.full_name, bold: true, size: 36, color: accent)], spacingAfter: 60))
 
         let contact = [cv.email, cv.phone, cv.location, cv.linkedin, cv.github, cv.portfolio]
             .filter { !$0.isEmpty }.joined(separator: "   |   ")
         if !contact.isEmpty { paragraphs.append(paragraph([Run(text: contact)], spacingAfter: 240)) }
 
         if !cv.summary.isEmpty {
-            paragraphs.append(paragraph([Run(text: "Summary", bold: true, size: 26)], spacingAfter: 80))
+            paragraphs.append(paragraph(heading("Summary"), spacingAfter: 80))
             paragraphs.append(paragraph([Run(text: cv.summary)], spacingAfter: 240))
         }
 
         if !cv.work_experience.isEmpty {
-            paragraphs.append(paragraph([Run(text: "Experience", bold: true, size: 26)], spacingAfter: 80))
+            paragraphs.append(paragraph(heading("Experience"), spacingAfter: 80))
             for job in cv.work_experience {
-                let heading = [job.title, job.company].filter { !$0.isEmpty }.joined(separator: ", ")
+                let jobHeading = [job.title, job.company].filter { !$0.isEmpty }.joined(separator: ", ")
                 let dates = [job.start, job.end].filter { !$0.isEmpty }.joined(separator: " – ")
-                var headingRuns = [Run(text: heading, bold: true)]
+                var headingRuns = [Run(text: jobHeading, bold: true)]
                 if !dates.isEmpty { headingRuns.append(Run(text: "   (\(dates))")) }
                 paragraphs.append(paragraph(headingRuns, spacingAfter: 40))
 
@@ -152,7 +206,7 @@ enum DocxWriter {
         }
 
         if !cv.education.isEmpty {
-            paragraphs.append(paragraph([Run(text: "Education", bold: true, size: 26)], spacingAfter: 80))
+            paragraphs.append(paragraph(heading("Education"), spacingAfter: 80))
             for edu in cv.education {
                 let line = [edu.degree, edu.institution].filter { !$0.isEmpty }.joined(separator: ", ")
                 let dates = [edu.start, edu.end].filter { !$0.isEmpty }.joined(separator: " – ")
@@ -163,7 +217,7 @@ enum DocxWriter {
         }
 
         if !cv.skills.isEmpty {
-            paragraphs.append(paragraph([Run(text: "Skills", bold: true, size: 26)], spacingAfter: 80))
+            paragraphs.append(paragraph(heading("Skills"), spacingAfter: 80))
             paragraphs.append(paragraph([Run(text: cv.skills.joined(separator: ", "))]))
         }
 
@@ -173,22 +227,33 @@ enum DocxWriter {
             "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">" +
             "<w:body>\(paragraphs.joined())\(sectPr)</w:body></w:document>"
 
+        let imageDefaults = mediaEntry.map { entry -> String in
+            let ext = (entry.name as NSString).pathExtension
+            let ct = imageContentType[ext] ?? "image/png"
+            return "<Default Extension=\"\(ext)\" ContentType=\"\(ct)\"/>"
+        } ?? ""
+
         let contentTypesXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
             "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
             "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
             "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+            imageDefaults +
             "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
             "</Types>"
 
-        let relsXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+        let packageRelsXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
             "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
             "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>" +
             "</Relationships>"
 
-        return buildZip([
+        var entries = [
             Entry(name: "[Content_Types].xml", data: Array(contentTypesXml.utf8)),
-            Entry(name: "_rels/.rels", data: Array(relsXml.utf8)),
+            Entry(name: "_rels/.rels", data: Array(packageRelsXml.utf8)),
             Entry(name: "word/document.xml", data: Array(documentXml.utf8)),
-        ])
+        ]
+        if let relsXml { entries.append(Entry(name: "word/_rels/document.xml.rels", data: Array(relsXml.utf8))) }
+        if let mediaEntry { entries.append(mediaEntry) }
+
+        return buildZip(entries)
     }
 }

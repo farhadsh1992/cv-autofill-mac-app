@@ -103,7 +103,7 @@ struct GenerateView: View {
         do {
             let client = state.aiClient(provider: selectedProvider, model: selectedModel)
             let tailored = try await client.generateTailoredCV(cvData: cv, jobContext: jobContext, context: state.contextBlock())
-            let data = DocxWriter.generate(cv: tailored)
+            let data = DocxWriter.generate(cv: tailored, style: state.cvStyle)
             saveWithPanel(data: data, suggestedName: "\(safeName(tailored.full_name))_Tailored_CV.docx")
             status = "Tailored CV saved. Review it before sending."
         } catch {

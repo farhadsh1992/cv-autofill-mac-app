@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -51,11 +52,40 @@ struct CVView: View {
                         Text(status).foregroundStyle(isError ? .red : .green)
                     }
                 }
+
+                if !state.cvStyle.isEmpty {
+                    styleSection
+                }
             }
             .padding()
         }
         .onAppear { syncFromState() }
         .navigationTitle("CV")
+    }
+
+    private var styleSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider().padding(.vertical, 4)
+            Text("Photo and accent color found in your uploaded .docx — used when generating a tailored CV so it isn't just plain black-and-white text. (Only works for .docx uploads; PDFs don't expose this the same way.)")
+                .foregroundStyle(.secondary)
+                .font(.footnote)
+            HStack(spacing: 10) {
+                if let data = state.cvStyle.photoData, let nsImage = NSImage(data: data) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                if let hex = state.cvStyle.accentColorHex {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(hex: hex))
+                        .frame(width: 24, height: 24)
+                    Text(hex).font(.footnote).foregroundStyle(.secondary)
+                }
+                Button("Clear style") { state.clearCVStyle() }
+            }
+        }
     }
 
     private func syncFromState() {
@@ -73,6 +103,11 @@ struct CVView: View {
             text = DocumentTextExtractor.extractPDFText(url: url) ?? ""
         } else if ext == "docx" {
             text = DocumentTextExtractor.extractDocxText(url: url) ?? ""
+            let style = DocxStyleExtractor.extractStyle(from: url)
+            if !style.isEmpty {
+                state.cvStyle = style
+                state.saveCVStyle()
+            }
         } else {
             text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
         }

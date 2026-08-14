@@ -20,7 +20,11 @@ why, and how to move data between them manually if you want to).
   application question your CV doesn't obviously answer.
 - **CV** — upload a PDF or Word `.docx` (extracted locally via PDFKit /
   `NSAttributedString`, no API call needed just to read the file), or paste
-  text; parsed into structured JSON by AI, editable directly.
+  text; parsed into structured JSON by AI, editable directly. If the
+  `.docx` has an embedded photo and/or a theme accent color, both get
+  pulled out automatically and reused in the tailored CV `.docx` from
+  Generate, instead of a plain black-and-white template (`.docx` only —
+  PDFs don't expose this the same structured way).
 - **Cover letter** — a saved reference letter, used as a style/tone guide
   when generating new ones (never copied verbatim).
 - **Resources** — free-form "about me" notes, plus links to your own
@@ -121,7 +125,8 @@ Sources/CVAutoFill/
   Storage.swift                   Application Support JSON/text files + Keychain
   Prompts.swift                   Ported verbatim from the extension's background.js
   AIClient.swift                  OpenAI Responses API / Anthropic Messages API, per-request provider+model
-  DocxWriter.swift                Ported from the extension's lib/docx-writer.js
+  DocxWriter.swift                Ported from the extension's lib/docx-writer.js, incl. photo/color embedding
+  DocxStyleExtractor.swift        Hand-rolled ZIP reader — pulls a photo + accent color out of an uploaded .docx
   DocumentIO.swift                PDFKit/NSAttributedString text extraction, CoreText PDF export
   ColorHex.swift                  Color <-> hex helpers for the accent-color picker
   Resources/logo.png              Bundled app logo (shown in the sidebar footer)
@@ -133,7 +138,11 @@ Sources/CVAutoFill/
 - Standalone storage (see "Extension vs. app" above).
 - The generated tailored CV `.docx` is a clean, simple, single-style
   layout — it's a content rewrite of your real CV, not a visual clone of
-  whatever template you originally uploaded.
+  whatever template you originally uploaded. The one exception: an
+  embedded photo and/or theme accent color from a `.docx` upload get
+  carried over, nothing else about the layout.
+- Photo/color extraction only works for `.docx` uploads — PDFs don't
+  expose an embedded image or theme color the same structured way.
 - Resource website fetching is a plain `URLSession` request + HTML-to-text
   pass — pages behind a login (most of LinkedIn) or rendered client-side
   will often come back mostly empty.

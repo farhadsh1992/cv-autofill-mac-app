@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     @Published var openaiApiKey: String
     @Published var anthropicApiKey: String
     @Published var usage: UsageLog
+    @Published var cvStyle: DocxStyle
 
     init() {
         settings = Storage.loadJSON(AppSettings.self, from: "settings.json") ?? AppSettings()
@@ -21,6 +22,7 @@ final class AppState: ObservableObject {
         openaiApiKey = Keychain.get(forKey: "openaiApiKey") ?? ""
         anthropicApiKey = Keychain.get(forKey: "anthropicApiKey") ?? ""
         usage = Storage.loadJSON(UsageLog.self, from: "usage.json") ?? UsageLog()
+        cvStyle = AppState.loadCVStyle()
     }
 
     func saveSettings() {
@@ -36,6 +38,39 @@ final class AppState: ObservableObject {
     func clearCV() {
         cvData = nil
         Storage.deleteFile("cv.json")
+    }
+
+    // Photo (extracted from an uploaded .docx) as a separate binary file;
+    // color + which extension the photo is in a small metadata JSON.
+    private static func loadCVStyle() -> DocxStyle {
+        guard let meta = Storage.loadJSON(CVStyleMeta.self, from: "cv-style.json") else { return DocxStyle() }
+        var style = DocxStyle()
+        style.accentColorHex = meta.accentColorHex
+        style.photoMimeType = meta.photoMimeType
+        if let ext = meta.photoExt {
+            style.photoData = Storage.loadData(from: "cv-style-photo.\(ext)")
+        }
+        return style
+    }
+
+    func saveCVStyle() {
+        guard !cvStyle.isEmpty else {
+            clearCVStyle()
+            return
+        }
+        var meta = CVStyleMeta(photoExt: nil, photoMimeType: cvStyle.photoMimeType, accentColorHex: cvStyle.accentColorHex)
+        if let data = cvStyle.photoData, let mime = cvStyle.photoMimeType {
+            let ext = DocxStyleExtractor.fileExtension(forMimeType: mime)
+            meta.photoExt = ext
+            Storage.saveData(data, to: "cv-style-photo.\(ext)")
+        }
+        Storage.saveJSON(meta, to: "cv-style.json")
+    }
+
+    func clearCVStyle() {
+        cvStyle = DocxStyle()
+        Storage.deleteFile("cv-style.json")
+        for ext in ["png", "jpg", "jpeg", "gif", "bmp"] { Storage.deleteFile("cv-style-photo.\(ext)") }
     }
 
     func saveCoverLetter() { Storage.saveText(coverLetterText, to: "cover-letter.txt") }

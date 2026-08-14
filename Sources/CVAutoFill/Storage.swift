@@ -37,6 +37,14 @@ enum Storage {
         try? text.write(to: url(for: file), atomically: true, encoding: .utf8)
     }
 
+    static func loadData(from file: String) -> Data? {
+        try? Data(contentsOf: url(for: file))
+    }
+
+    static func saveData(_ data: Data, to file: String) {
+        try? data.write(to: url(for: file), options: .atomic)
+    }
+
     static func deleteFile(_ file: String) {
         try? FileManager.default.removeItem(at: url(for: file))
     }
