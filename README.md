@@ -153,3 +153,7 @@ Sources/CVAutoFill/
 - Not code-signed with a real Developer ID, just ad-hoc — fine for running
   on your own Mac, but macOS will warn if you copy the `.app` to another
   machine.
+
+## License
+
+[MIT](LICENSE)

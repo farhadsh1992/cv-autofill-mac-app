@@ -61,7 +61,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>Personal tool — not for redistribution.</string>
+    <string>Copyright (c) 2026 Farhad Shadmand. MIT License.</string>
 </dict>
 </plist>
 PLIST
