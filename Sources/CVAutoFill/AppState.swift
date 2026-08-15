@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     @Published var coverLetterText: String
     @Published var aboutMeText: String
     @Published var resources: [ResourceItem]
+    @Published var jobs: [JobItem]
     @Published var openaiApiKey: String
     @Published var anthropicApiKey: String
     @Published var usage: UsageLog
@@ -19,6 +20,7 @@ final class AppState: ObservableObject {
         coverLetterText = Storage.loadText(from: "cover-letter.txt") ?? ""
         aboutMeText = Storage.loadText(from: "about-me.txt") ?? ""
         resources = Storage.loadJSON([ResourceItem].self, from: "resources.json") ?? []
+        jobs = Storage.loadJSON([JobItem].self, from: "jobs.json") ?? []
         openaiApiKey = Keychain.get(forKey: "openaiApiKey") ?? ""
         anthropicApiKey = Keychain.get(forKey: "anthropicApiKey") ?? ""
         usage = Storage.loadJSON(UsageLog.self, from: "usage.json") ?? UsageLog()
@@ -76,6 +78,7 @@ final class AppState: ObservableObject {
     func saveCoverLetter() { Storage.saveText(coverLetterText, to: "cover-letter.txt") }
     func saveAboutMe() { Storage.saveText(aboutMeText, to: "about-me.txt") }
     func saveResources() { Storage.saveJSON(resources, to: "resources.json") }
+    func saveJobs() { Storage.saveJSON(jobs, to: "jobs.json") }
 
     func contextBlock() -> String {
         ContextBuilder.build(aboutMe: aboutMeText, resources: resources)

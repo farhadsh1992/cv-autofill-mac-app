@@ -34,6 +34,14 @@ why, and how to move data between them manually if you want to).
 - **Resources** — free-form "about me" notes, plus links to your own
   websites (fetched once, content saved as extra context for every AI
   call above).
+- **Jobs** — a table of jobs you've applied to (title, company, location,
+  requirements, link, and a results field you fill in yourself — interview,
+  rejected, offer, whatever). Add rows manually, edit Results inline, remove
+  any time. "Export Word + JSON" writes `applied jobs.docx` (the same
+  landscape table format) and `applied jobs.json` straight to your Downloads
+  folder — no dialog, overwriting the previous export each time. Mirrors the
+  browser extension's own Jobs tab, though the two don't currently share
+  data (see Where your data lives below).
 - **Settings** — API keys, models, appearance, and a running usage/cost
   summary.
 
@@ -77,11 +85,18 @@ app has none of that, so:
 
 ## Where your data lives
 
-- CV, cover letter, resources, about-me notes, usage stats:
+- CV, cover letter, resources, about-me notes, applied jobs, usage stats:
   `~/Library/Application Support/Farhad's CV AutoFill/` as plain JSON/text
   files.
 - API keys: macOS Keychain (service `com.farhadshad.cvautofill`), not a
   plain file.
+
+This app's storage and the browser extension's (`chrome.storage.local`,
+inside the browser's own profile) are completely separate — a browser
+extension has no API to read/write an arbitrary native app's files, and a
+native app has no access to browser extension storage either. Nothing here
+syncs automatically between the two today; each keeps its own CV, jobs,
+etc. independently.
 
 ## Build & run
 
@@ -125,12 +140,13 @@ build_app.sh                     Builds + bundles into dist/Farhad's CV AutoFill
 Sources/CVAutoFill/
   CVAutoFillApp.swift             @main entry point, window sizing, appearance modifiers
   AppState.swift                  ObservableObject — loads/saves everything, builds AI clients
-  Models.swift                    CVData/ResourceItem/AppSettings (same shape as the extension's)
+  Models.swift                    CVData/ResourceItem/JobItem/AppSettings (same shape as the extension's)
   Usage.swift                     Token/cost tracking, model catalog, price table
   Storage.swift                   Application Support JSON/text files + Keychain
   Prompts.swift                   Ported verbatim from the extension's background.js
   AIClient.swift                  OpenAI Responses API / Anthropic Messages API, per-request provider+model
-  DocxWriter.swift                Ported from the extension's lib/docx-writer.js, incl. photo/color embedding
+  DocxWriter.swift                Ported from the extension's lib/docx-writer.js — CV template with photo/color
+                                   embedding, plus generateJobs() for the applied-jobs table export
   DocxStyleExtractor.swift        Hand-rolled ZIP reader — pulls a photo + accent color out of an uploaded .docx
   DocumentIO.swift                PDFKit/NSAttributedString text extraction, CoreText PDF export
   ColorHex.swift                  Color <-> hex helpers for the accent-color picker

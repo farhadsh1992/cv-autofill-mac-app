@@ -7,6 +7,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case cv = "CV"
     case coverLetter = "Cover letter"
     case resources = "Resources"
+    case jobs = "Jobs"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -18,6 +19,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .generate: return "sparkles"
         case .ask: return "bubble.left.and.bubble.right"
         case .resources: return "link"
+        case .jobs: return "briefcase"
         case .settings: return "gearshape"
         }
     }
@@ -44,6 +46,7 @@ struct ContentView: View {
                 case .generate: GenerateView()
                 case .ask: AskView()
                 case .resources: ResourcesView()
+                case .jobs: JobsView()
                 case .settings: SettingsView()
                 case .none: Text("Select a section").foregroundStyle(.secondary)
                 }

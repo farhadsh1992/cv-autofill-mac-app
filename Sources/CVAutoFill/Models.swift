@@ -85,6 +85,31 @@ struct ResourceItem: Codable, Identifiable, Equatable {
     var addedAt: Date = Date()
 }
 
+struct JobItem: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var title: String = ""
+    var company: String = ""
+    var location: String = ""
+    var requirements: String = ""
+    var link: String = ""
+    var results: String = ""
+    var addedAt: Date = Date()
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        company = try c.decodeIfPresent(String.self, forKey: .company) ?? ""
+        location = try c.decodeIfPresent(String.self, forKey: .location) ?? ""
+        requirements = try c.decodeIfPresent(String.self, forKey: .requirements) ?? ""
+        link = try c.decodeIfPresent(String.self, forKey: .link) ?? ""
+        results = try c.decodeIfPresent(String.self, forKey: .results) ?? ""
+        addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
+    }
+}
+
 enum Provider: String, Codable, CaseIterable, Hashable {
     case openai
     case anthropic

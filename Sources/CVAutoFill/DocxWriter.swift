@@ -256,4 +256,65 @@ enum DocxWriter {
 
         return buildZip(entries)
     }
+
+    // ---- Simple bordered table doc (used for the "applied jobs" export) ----
+
+    private static func tableCell(_ text: String, widthDxa: Int, bold: Bool = false) -> String {
+        let tcPr = "<w:tcPr><w:tcW w:w=\"\(widthDxa)\" w:type=\"dxa\"/></w:tcPr>"
+        return "<w:tc>\(tcPr)\(paragraph([Run(text: text, bold: bold)]))</w:tc>"
+    }
+
+    private static func tableRow(_ cells: [String]) -> String { "<w:tr>\(cells.joined())</w:tr>" }
+
+    private static func table(headers: [String], rows: [[String]], widths: [Int]) -> String {
+        let grid = widths.map { "<w:gridCol w:w=\"\($0)\"/>" }.joined()
+        let edges = ["top", "left", "bottom", "right", "insideH", "insideV"]
+        let borders = "<w:tblBorders>" + edges.map { "<w:\($0) w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"999999\"/>" }.joined() + "</w:tblBorders>"
+        let tblPr = "<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>\(borders)</w:tblPr>"
+        let headerRow = tableRow(zip(headers, widths).map { tableCell($0, widthDxa: $1, bold: true) })
+        let dataRows = rows.map { row in tableRow(zip(row, widths).map { tableCell($0, widthDxa: $1) }) }.joined()
+        return "<w:tbl>\(tblPr)<w:tblGrid>\(grid)</w:tblGrid>\(headerRow)\(dataRows)</w:tbl>"
+    }
+
+    /// jobs: applied-job rows for the landscape table export.
+    static func generateJobs(_ jobs: [JobItem]) -> Data {
+        let headers = ["Job title", "Company", "Location", "Requirements", "Link", "Results"]
+        // dxa (twentieths of a point); landscape letter minus 1" margins each side = 13680 dxa available.
+        let widths = [1800, 1600, 1400, 4480, 2400, 2000]
+        let rows = jobs.map { [$0.title, $0.company, $0.location, $0.requirements, $0.link, $0.results] }
+
+        let paragraphs = [
+            paragraph([Run(text: "Applied Jobs", bold: true, size: 32)], spacingAfter: 200),
+            table(headers: headers, rows: rows, widths: widths),
+            // OOXML requires a paragraph after a table that's the last block in the body.
+            paragraph([]),
+        ]
+
+        let sectPr = "<w:sectPr><w:pgSz w:w=\"15840\" w:h=\"12240\" w:orient=\"landscape\"/>" +
+            "<w:pgMar w:top=\"1080\" w:right=\"1080\" w:bottom=\"1080\" w:left=\"1080\"/></w:sectPr>"
+
+        let documentXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">" +
+            "<w:body>\(paragraphs.joined())\(sectPr)</w:body></w:document>"
+
+        let contentTypesXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+            "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+            "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+            "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
+            "</Types>"
+
+        let packageRelsXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+            "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>" +
+            "</Relationships>"
+
+        let entries = [
+            Entry(name: "[Content_Types].xml", data: Array(contentTypesXml.utf8)),
+            Entry(name: "_rels/.rels", data: Array(packageRelsXml.utf8)),
+            Entry(name: "word/document.xml", data: Array(documentXml.utf8)),
+        ]
+
+        return buildZip(entries)
+    }
 }
