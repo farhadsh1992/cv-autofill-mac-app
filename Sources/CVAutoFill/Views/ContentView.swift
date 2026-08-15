@@ -59,18 +59,16 @@ struct ContentView: View {
 
 private struct SidebarFooter: View {
     var body: some View {
-        HStack(spacing: 8) {
+        HStack {
+            Spacer()
             if let url = Bundle.module.url(forResource: "logo", withExtension: "png"),
                let nsImage = NSImage(contentsOf: url) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 22, height: 22)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            Text("Farhad's CV AutoFill")
-                .font(.caption)
-                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 12)

@@ -61,7 +61,9 @@ provider — treat it as a rough guide, not your actual bill.
 
 ## Appearance
 
-Settings has a Theme picker (System/Light/Dark), a button color picker
+Settings is split into three tabs: **Appearance**, **AI**, **Backup**.
+
+Appearance has a Theme picker (System/Light/Dark), a button color picker
 (defaults to the app's brand red, `#9E230B`), and a button style choice:
 **Normal** (standard macOS bordered buttons) or **Glass** — macOS 26
 "Tahoe"'s Liquid Glass button material. Verified against the actual
