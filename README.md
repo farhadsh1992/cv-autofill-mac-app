@@ -99,12 +99,13 @@ open "dist/Farhad's CV AutoFill.app"
 
 ## Icon
 
-Same flat-vector mark as the browser extension — CV document, sync badge,
-generic "TXT" badge, folder with an "F" monogram, in `#9E230B`. Source SVGs
-live in the [extension repo](https://github.com/farhadsh1992/cv-autofill-extension)'s
-`icon-design/` folder (`icon_final_hero.svg` for the app icon and the
-sidebar logo, `icon_final_simple.svg` for the small macOS iconset sizes
-where the full mark gets muddy) — the icon isn't duplicated in this repo.
+Same gold-and-crimson crest as the browser extension, used unmodified at
+every size (no recoloring, no simplification). Source lives in the
+[extension repo](https://github.com/farhadsh1992/cv-autofill-extension)'s
+`icon-design/` folder (`logo_source.png` is the original artwork;
+`AppIcon.icns`/`AppIcon.iconset` are generated from it) — the icon isn't
+duplicated in this repo. The sidebar footer logo (`Sources/CVAutoFill/Resources/logo.png`)
+is the same image too, resized to fit that small corner.
 
 **This means `build_app.sh` expects the extension repo checked out as a
 sibling directory** (`../cv_autofill_extension/icon-design/AppIcon.icns`,
