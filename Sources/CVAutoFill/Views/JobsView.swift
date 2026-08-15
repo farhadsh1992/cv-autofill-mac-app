@@ -45,10 +45,11 @@ struct JobsView: View {
                 HStack {
                     Text("Saved jobs").font(.headline)
                     Spacer()
+                    Button("Upload from extension") { uploadFromExtension() }
                     Button("Export Word + JSON") { exportFiles() }
                         .disabled(state.jobs.isEmpty)
                 }
-                Text("Saves \"applied jobs.docx\" and \"applied jobs.json\" straight to your Downloads folder — no dialog, each export overwrites the previous one.")
+                Text("\"Upload from extension\" reads an \"applied jobs.json\" file saved by the browser extension's Save this job / Export, and adds those rows here alongside whatever's already in this table. \"Export Word + JSON\" saves \"applied jobs.docx\" and \"applied jobs.json\" straight to your Downloads folder — no dialog, each export overwrites the previous one.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -131,6 +132,52 @@ struct JobsView: View {
     private func remove(_ job: JobItem) {
         state.jobs.removeAll { $0.id == job.id }
         state.saveJobs()
+    }
+
+    private func uploadFromExtension() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose the \"applied jobs.json\" file saved by the browser extension."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            guard let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                status = "That doesn't look like an applied-jobs JSON file."
+                isError = true
+                return
+            }
+            let imported: [JobItem] = array.map { o in
+                var job = JobItem()
+                job.id = (o["id"] as? String).flatMap { UUID(uuidString: $0) } ?? UUID()
+                job.title = o["title"] as? String ?? ""
+                job.company = o["company"] as? String ?? ""
+                job.location = o["location"] as? String ?? ""
+                job.requirements = o["requirements"] as? String ?? ""
+                job.link = o["link"] as? String ?? ""
+                job.results = o["results"] as? String ?? ""
+                job.addedAt = parseFlexibleDate(o["addedAt"]) ?? Date()
+                return job
+            }
+            let existingIds = Set(state.jobs.map(\.id))
+            let newOnes = imported.filter { !existingIds.contains($0.id) }
+            state.jobs.append(contentsOf: newOnes)
+            state.saveJobs()
+            status = "Added \(newOnes.count) job(s) from the extension" + (newOnes.count < imported.count ? " (\(imported.count - newOnes.count) already here)." : ".")
+            isError = false
+        } catch {
+            status = "Upload failed: \(error.localizedDescription)"
+            isError = true
+        }
+    }
+
+    // The extension writes addedAt as epoch-ms numbers; this app's own
+    // exports use ISO8601 strings — accept either.
+    private func parseFlexibleDate(_ value: Any?) -> Date? {
+        if let ms = value as? Double { return Date(timeIntervalSince1970: ms / 1000) }
+        if let ms = value as? Int { return Date(timeIntervalSince1970: Double(ms) / 1000) }
+        if let s = value as? String { return ISO8601DateFormatter().date(from: s) }
+        return nil
     }
 
     private func exportFiles() {

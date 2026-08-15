@@ -37,11 +37,13 @@ why, and how to move data between them manually if you want to).
 - **Jobs** — a table of jobs you've applied to (title, company, location,
   requirements, link, and a results field you fill in yourself — interview,
   rejected, offer, whatever). Add rows manually, edit Results inline, remove
-  any time. "Export Word + JSON" writes `applied jobs.docx` (the same
-  landscape table format) and `applied jobs.json` straight to your Downloads
-  folder — no dialog, overwriting the previous export each time. Mirrors the
-  browser extension's own Jobs tab, though the two don't currently share
-  data (see Where your data lives below).
+  any time. "Upload from extension" reads an `applied jobs.json` file saved
+  by the browser extension's Save this job / Export and adds those rows here
+  alongside whatever's already in the table (skips ones already present, by
+  id — safe to re-upload the same file). "Export Word + JSON" writes
+  `applied jobs.docx` (the same landscape table format) and
+  `applied jobs.json` straight to your Downloads folder — no dialog,
+  overwriting the previous export each time.
 - **Settings** — API keys, models, appearance, and a running usage/cost
   summary.
 
@@ -127,7 +129,9 @@ every size (no recoloring, no simplification). Source lives in the
 `icon-design/` folder (`logo_source.png` is the original artwork;
 `AppIcon.icns`/`AppIcon.iconset` are generated from it) — the icon isn't
 duplicated in this repo. The sidebar footer logo (`Sources/CVAutoFill/Resources/logo.png`)
-is the same image too, resized to fit that small corner.
+is the same image too, shown large (132px) with a running estimated token
+spend (OpenAI + Anthropic combined, same estimate as the Settings usage
+summary) above it.
 
 **This means `build_app.sh` expects the extension repo checked out as a
 sibling directory** (`../cv_autofill_extension/icon-design/AppIcon.icns`,

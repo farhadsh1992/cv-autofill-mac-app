@@ -58,20 +58,31 @@ struct ContentView: View {
 }
 
 private struct SidebarFooter: View {
+    @EnvironmentObject var state: AppState
+
     var body: some View {
-        HStack {
-            Spacer()
+        VStack(spacing: 6) {
+            Text("~$\(String(format: "%.4f", totalEstimatedSpend)) spent")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
             if let url = Bundle.module.url(forResource: "logo", withExtension: "png"),
                let nsImage = NSImage(contentsOf: url) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .frame(width: 132, height: 132)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
             }
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    private var totalEstimatedSpend: Double {
+        Provider.allCases.reduce(0) { total, provider in
+            total + state.usageEntries(for: provider).reduce(0) { $0 + $1.estimatedCost }
+        }
     }
 }
