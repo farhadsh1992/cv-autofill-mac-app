@@ -85,6 +85,25 @@ struct ResourceItem: Codable, Identifiable, Equatable {
     var addedAt: Date = Date()
 }
 
+// Same shape as the browser extension's aboutMeNotes entries — labeled
+// notes instead of one free-text blob.
+struct AboutMeNote: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var label: String = "Note"
+    var content: String = ""
+    var addedAt: Date = Date()
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? "Note"
+        content = try c.decodeIfPresent(String.self, forKey: .content) ?? ""
+        addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
+    }
+}
+
 struct JobItem: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var title: String = ""

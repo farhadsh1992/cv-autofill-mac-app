@@ -178,7 +178,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var backupSection: some View {
         Section {
-            Text("Reads and writes the same JSON format as the browser extension's Options → Info → Backup — export from one, import into the other, to move your CV, resources, applied jobs, and API keys (all four providers) across. Not automatic: run this whenever you want the two back in sync. A couple of things don't carry over either way — Addresses aren't supported in this app yet, and About Me notes get merged into this app's single text field.")
+            Text("Reads and writes the same JSON format as the browser extension's Options → Info → Backup — export from one, import into the other, to move your CV, About Me notes, resources, applied jobs, and API keys (all four providers) across. Not automatic: run this whenever you want the two back in sync. One thing doesn't carry over either way — Addresses aren't supported in this app yet.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HStack {

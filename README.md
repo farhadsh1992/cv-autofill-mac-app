@@ -31,9 +31,14 @@ why, and how to move data between them manually if you want to).
   PDFs don't expose this the same structured way).
 - **Cover letter** — a saved reference letter, used as a style/tone guide
   when generating new ones (never copied verbatim).
-- **Resources** — free-form "about me" notes, plus links to your own
-  websites (fetched once, content saved as extra context for every AI
-  call above).
+- **Resources** — two tabs, **Add** and **Saved**, matching the Jobs layout.
+  Add has three forms: labeled About Me notes (same shape as the browser
+  extension's About Me tab — title + content, add as many as you want,
+  instead of one big text field), websites (fetched once, content saved as
+  context), and quick notes. Saved lists everything from both — each item
+  collapsed to just its title, click to expand and see the full content
+  (and a Remove button), so a long list of notes doesn't turn into a wall
+  of text. All of it feeds into every AI call the same way as before.
 - **Jobs** — two tabs, **Saved Jobs** and **Apply Job**. Saved Jobs shows
   every job you've logged in a real table (same columns, same order, as the
   browser extension's own Jobs tab: title, company, date, location,
@@ -97,10 +102,9 @@ app has none of that, so:
   browser.
 - Generate works from a **pasted job description** instead of scraping the
   current page.
-- Storage is separate. If you want to move data between the two, the JSON
-  shapes match — copy `cv.json` / `cover-letter.txt` / `about-me.txt` /
-  `resources.json` from one app's data folder into the other's (paths
-  below).
+- Storage is separate — a browser extension and a native app can't share
+  storage directly. Settings → Backup (Export/Import) is how you move data
+  between them (see below).
 
 ## Where your data lives
 
@@ -162,7 +166,7 @@ build_app.sh                     Builds + bundles into dist/Farhad's CV AutoFill
 Sources/CVAutoFill/
   CVAutoFillApp.swift             @main entry point, window sizing, appearance modifiers
   AppState.swift                  ObservableObject — loads/saves everything, builds AI clients
-  Models.swift                    CVData/ResourceItem/JobItem/AppSettings (same shape as the extension's)
+  Models.swift                    CVData/ResourceItem/AboutMeNote/JobItem/AppSettings (same shape as the extension's)
   Usage.swift                     Token/cost tracking, model catalog, price table
   Storage.swift                   Application Support JSON/text files + Keychain
   Prompts.swift                   Ported verbatim from the extension's background.js

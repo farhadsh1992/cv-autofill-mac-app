@@ -74,8 +74,17 @@ enum Prompts {
 }
 
 enum ContextBuilder {
-    static func build(aboutMe: String, resources: [ResourceItem]) -> String {
-        var parts = ["ABOUT_ME:\n\(aboutMe.isEmpty ? "(none provided)" : aboutMe)"]
+    static func build(aboutMeNotes: [AboutMeNote], resources: [ResourceItem]) -> String {
+        var aboutMeBlock: String
+        if aboutMeNotes.isEmpty {
+            aboutMeBlock = "(none provided)"
+        } else {
+            let recentNotes = aboutMeNotes.suffix(8)
+            aboutMeBlock = recentNotes
+                .map { "- \($0.label):\n\(String($0.content.prefix(1500)))" }
+                .joined(separator: "\n\n")
+        }
+        var parts = ["ABOUT_ME:\n\(aboutMeBlock)"]
         if resources.isEmpty {
             parts.append("ADDITIONAL_RESOURCES:\n(none provided)")
         } else {

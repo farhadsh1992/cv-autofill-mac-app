@@ -6,7 +6,7 @@ final class AppState: ObservableObject {
     @Published var settings: AppSettings
     @Published var cvData: CVData?
     @Published var coverLetterText: String
-    @Published var aboutMeText: String
+    @Published var aboutMeNotes: [AboutMeNote]
     @Published var resources: [ResourceItem]
     @Published var jobs: [JobItem]
     @Published var openaiApiKey: String
@@ -21,7 +21,7 @@ final class AppState: ObservableObject {
         settings = Storage.loadJSON(AppSettings.self, from: "settings.json") ?? AppSettings()
         cvData = Storage.loadJSON(CVData.self, from: "cv.json")
         coverLetterText = Storage.loadText(from: "cover-letter.txt") ?? ""
-        aboutMeText = Storage.loadText(from: "about-me.txt") ?? ""
+        aboutMeNotes = Storage.loadJSON([AboutMeNote].self, from: "about-me-notes.json") ?? []
         resources = Storage.loadJSON([ResourceItem].self, from: "resources.json") ?? []
         jobs = Storage.loadJSON([JobItem].self, from: "jobs.json") ?? []
         openaiApiKey = Keychain.get(forKey: "openaiApiKey") ?? ""
@@ -30,7 +30,24 @@ final class AppState: ObservableObject {
         geminiApiKey = Keychain.get(forKey: "geminiApiKey") ?? ""
         usage = Storage.loadJSON(UsageLog.self, from: "usage.json") ?? UsageLog()
         cvStyle = AppState.loadCVStyle()
+        migrateLegacyAboutMeText()
         autoImportJobsFromDownloads()
+    }
+
+    // One-time: the old design stored About Me as a single free-text file
+    // (about-me.txt). If there's no notes.json yet but that legacy file
+    // exists with real content, wrap it as one labeled note instead of
+    // silently losing it, then remove the old file.
+    private func migrateLegacyAboutMeText() {
+        guard aboutMeNotes.isEmpty else { return }
+        guard let legacyText = Storage.loadText(from: "about-me.txt")?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !legacyText.isEmpty else { return }
+        var note = AboutMeNote()
+        note.label = "About me"
+        note.content = legacyText
+        aboutMeNotes = [note]
+        Storage.saveJSON(aboutMeNotes, to: "about-me-notes.json")
+        Storage.deleteFile("about-me.txt")
     }
 
     // Checked once per launch: if the browser extension has left an
@@ -100,12 +117,12 @@ final class AppState: ObservableObject {
     }
 
     func saveCoverLetter() { Storage.saveText(coverLetterText, to: "cover-letter.txt") }
-    func saveAboutMe() { Storage.saveText(aboutMeText, to: "about-me.txt") }
+    func saveAboutMeNotes() { Storage.saveJSON(aboutMeNotes, to: "about-me-notes.json") }
     func saveResources() { Storage.saveJSON(resources, to: "resources.json") }
     func saveJobs() { Storage.saveJSON(jobs, to: "jobs.json") }
 
     func contextBlock() -> String {
-        ContextBuilder.build(aboutMe: aboutMeText, resources: resources)
+        ContextBuilder.build(aboutMeNotes: aboutMeNotes, resources: resources)
     }
 
     func modelFor(_ provider: Provider) -> String {

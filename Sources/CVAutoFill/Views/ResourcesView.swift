@@ -1,37 +1,58 @@
 import SwiftUI
 
+enum ResourcesTab: String, CaseIterable, Identifiable {
+    case add = "Add"
+    case saved = "Saved"
+
+    var id: String { rawValue }
+}
+
 struct ResourcesView: View {
     @EnvironmentObject var state: AppState
-    @State private var newURL = ""
+    @State private var tab: ResourcesTab = .add
+
     @State private var newNoteLabel = ""
     @State private var newNoteContent = ""
+    @State private var newURL = ""
+    @State private var newQuickNoteLabel = ""
+    @State private var newQuickNoteContent = ""
     @State private var busy = false
     @State private var status = ""
     @State private var isError = false
 
     var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $tab) {
+                ForEach(ResourcesTab.allCases) { t in
+                    Text(t.rawValue).tag(t)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding()
+
+            switch tab {
+            case .add: addTab
+            case .saved: savedTab
+            }
+        }
+        .navigationTitle("Resources")
+    }
+
+    // ---- Add ----
+
+    private var addTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Resources").font(.title2)
-
                 Group {
                     Text("About me / notes").font(.headline)
-                    Text("Free-form background the AI can draw on — used the same way as your CV everywhere in this app.")
+                    Text("Labeled notes the AI can draw on — things not in your CV, availability, preferences, whatever's useful. Used the same way as your CV everywhere in this app.")
                         .foregroundStyle(.secondary)
-                    TextEditor(text: $state.aboutMeText)
-                        .frame(minHeight: 100)
+                    TextField("Title — e.g. Availability", text: $newNoteLabel)
+                    TextEditor(text: $newNoteContent)
+                        .frame(minHeight: 80)
                         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
-                    HStack {
-                        Button("Save") {
-                            state.saveAboutMe()
-                            status = "Saved."
-                            isError = false
-                        }
-                        Button("Clear", role: .destructive) {
-                            state.aboutMeText = ""
-                            state.saveAboutMe()
-                        }
-                    }
+                    Button("Add note") { addAboutMeNote() }
                 }
 
                 Divider()
@@ -49,40 +70,36 @@ struct ResourcesView: View {
 
                 Group {
                     Text("Add a quick note").font(.headline)
-                    TextField("Label (optional)", text: $newNoteLabel)
-                    TextEditor(text: $newNoteContent)
+                    Text("A resource note — separate from About Me above, for anything else worth the AI having as context.")
+                        .foregroundStyle(.secondary)
+                    TextField("Label (optional)", text: $newQuickNoteLabel)
+                    TextEditor(text: $newQuickNoteContent)
                         .frame(minHeight: 80)
                         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
-                    Button("Save note") { addNote() }
+                    Button("Save note") { addQuickNote() }
                 }
 
                 if !status.isEmpty { Text(status).foregroundStyle(isError ? .red : .green) }
-
-                Divider()
-
-                Text("Saved resources").font(.headline)
-                if state.resources.isEmpty {
-                    Text("None yet.").foregroundStyle(.secondary)
-                } else {
-                    ForEach(state.resources.reversed()) { r in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(r.label).bold()
-                                Spacer()
-                                Button("Remove") { remove(r) }
-                            }
-                            Text(String(r.content.prefix(160)))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(8)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
-                    }
-                }
             }
             .padding()
         }
-        .navigationTitle("Resources")
+    }
+
+    private func addAboutMeNote() {
+        guard !newNoteContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            status = "Write something first."
+            isError = true
+            return
+        }
+        var note = AboutMeNote()
+        note.label = newNoteLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Note" : newNoteLabel
+        note.content = newNoteContent
+        state.aboutMeNotes.append(note)
+        state.saveAboutMeNotes()
+        newNoteLabel = ""
+        newNoteContent = ""
+        status = "Note added."
+        isError = false
     }
 
     private func addWebsite() async {
@@ -110,21 +127,79 @@ struct ResourcesView: View {
         busy = false
     }
 
-    private func addNote() {
-        guard !newNoteContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    private func addQuickNote() {
+        guard !newQuickNoteContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             status = "Write something first."
             isError = true
             return
         }
-        state.resources.append(ResourceItem(label: newNoteLabel.isEmpty ? "Quick note" : newNoteLabel, url: nil, content: newNoteContent))
+        state.resources.append(ResourceItem(
+            label: newQuickNoteLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Quick note" : newQuickNoteLabel,
+            url: nil, content: newQuickNoteContent
+        ))
         state.saveResources()
-        newNoteLabel = ""
-        newNoteContent = ""
+        newQuickNoteLabel = ""
+        newQuickNoteContent = ""
         status = "Saved."
         isError = false
     }
 
-    private func remove(_ r: ResourceItem) {
+    // ---- Saved ----
+
+    private var savedTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("About Me Notes").font(.headline)
+                if state.aboutMeNotes.isEmpty {
+                    Text("None yet — add one in the Add tab.").foregroundStyle(.secondary)
+                } else {
+                    ForEach(state.aboutMeNotes.reversed()) { note in
+                        savedRow(label: note.label, content: note.content) { removeAboutMeNote(note) }
+                    }
+                }
+
+                Divider()
+
+                Text("Resources").font(.headline)
+                if state.resources.isEmpty {
+                    Text("None yet — add one in the Add tab.").foregroundStyle(.secondary)
+                } else {
+                    ForEach(state.resources.reversed()) { r in
+                        savedRow(label: r.label, content: r.content, url: r.url) { removeResource(r) }
+                    }
+                }
+            }
+            .padding()
+        }
+    }
+
+    // Collapsed by default — just the title. Click to expand and see the
+    // full content, matching how the browser extension's saved lists work.
+    private func savedRow(label: String, content: String, url: String? = nil, remove: @escaping () -> Void) -> some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 8) {
+                if let url, let u = URL(string: url) {
+                    Link(url, destination: u).font(.footnote)
+                }
+                Text(content)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                Button("Remove", role: .destructive, action: remove)
+            }
+            .padding(.top, 4)
+        } label: {
+            Text(label).bold()
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
+    }
+
+    private func removeAboutMeNote(_ note: AboutMeNote) {
+        state.aboutMeNotes.removeAll { $0.id == note.id }
+        state.saveAboutMeNotes()
+    }
+
+    private func removeResource(_ r: ResourceItem) {
         state.resources.removeAll { $0.id == r.id }
         state.saveResources()
     }

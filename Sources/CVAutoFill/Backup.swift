@@ -2,10 +2,9 @@ import Foundation
 
 // Reads/writes the same JSON shape as the browser extension's Options →
 // Info → Backup (Export/Import backup) — cv-autofill-backup.json. The two
-// apps' internal models differ in a couple of places (About Me is a single
-// text field here, not labeled notes; there's no Addresses feature here at
-// all) — import pulls in whatever maps cleanly and reports the rest as
-// skipped rather than silently dropping or mangling it.
+// apps' internal models differ in one remaining place (there's no Addresses
+// feature here at all) — import pulls in whatever maps cleanly and reports
+// the rest as skipped rather than silently dropping or mangling it.
 //
 // Built with plain [String: Any] dictionaries + JSONSerialization instead
 // of matching Codable structs, since the two schemas aren't identical and
@@ -48,13 +47,13 @@ enum Backup {
 
         dict["coverLetterText"] = state.coverLetterText
 
-        if !state.aboutMeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            dict["aboutMeNotes"] = [[
-                "id": UUID().uuidString,
-                "label": "About me",
-                "content": state.aboutMeText,
-                "addedAt": ISO8601DateFormatter().string(from: Date()),
-            ]]
+        dict["aboutMeNotes"] = state.aboutMeNotes.map { n -> [String: Any] in
+            [
+                "id": n.id.uuidString,
+                "label": n.label,
+                "content": n.content,
+                "addedAt": ISO8601DateFormatter().string(from: n.addedAt),
+            ]
         }
 
         dict["resources"] = state.resources.map { r -> [String: Any] in
@@ -142,13 +141,16 @@ enum Backup {
             result.imported.append("Cover letter")
         }
 
-        if let notes = dict["aboutMeNotes"] as? [[String: Any]], !notes.isEmpty {
-            state.aboutMeText = notes.map { note -> String in
-                let label = note["label"] as? String ?? "Note"
-                let content = note["content"] as? String ?? ""
-                return "\(label):\n\(content)"
-            }.joined(separator: "\n\n")
-            result.imported.append("About me notes (merged into one text field)")
+        if let notes = dict["aboutMeNotes"] as? [[String: Any]] {
+            state.aboutMeNotes = notes.map { o in
+                var note = AboutMeNote()
+                note.id = (o["id"] as? String).flatMap { UUID(uuidString: $0) } ?? UUID()
+                note.label = o["label"] as? String ?? "Note"
+                note.content = o["content"] as? String ?? ""
+                note.addedAt = JobsImport.parseFlexibleDate(o["addedAt"]) ?? Date()
+                return note
+            }
+            result.imported.append("About me notes")
         }
 
         if let addresses = dict["addresses"] as? [[String: Any]], !addresses.isEmpty {
@@ -185,7 +187,7 @@ enum Backup {
         state.saveCV()
         state.saveCVStyle()
         state.saveCoverLetter()
-        state.saveAboutMe()
+        state.saveAboutMeNotes()
         state.saveResources()
         state.saveJobs()
 
