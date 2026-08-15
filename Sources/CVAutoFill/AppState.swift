@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
     @Published var anthropicApiKey: String
     @Published var usage: UsageLog
     @Published var cvStyle: DocxStyle
+    @Published var lastAutoImportMessage: String?
 
     init() {
         settings = Storage.loadJSON(AppSettings.self, from: "settings.json") ?? AppSettings()
@@ -25,6 +26,23 @@ final class AppState: ObservableObject {
         anthropicApiKey = Keychain.get(forKey: "anthropicApiKey") ?? ""
         usage = Storage.loadJSON(UsageLog.self, from: "usage.json") ?? UsageLog()
         cvStyle = AppState.loadCVStyle()
+        autoImportJobsFromDownloads()
+    }
+
+    // Checked once per launch: if the browser extension has left an
+    // "applied jobs.json" in Downloads (from Save this job / Export), pull
+    // in whatever rows aren't already here by id. Safe to run every launch —
+    // re-importing the same file is a no-op since nothing new matches.
+    private func autoImportJobsFromDownloads() {
+        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
+        let url = downloads.appendingPathComponent("applied jobs.json")
+        guard let data = try? Data(contentsOf: url), let imported = JobsImport.parse(data) else { return }
+        let existingIds = Set(jobs.map(\.id))
+        let newOnes = imported.filter { !existingIds.contains($0.id) }
+        guard !newOnes.isEmpty else { return }
+        jobs.append(contentsOf: newOnes)
+        saveJobs()
+        lastAutoImportMessage = "Automatically added \(newOnes.count) job(s) found in Downloads/applied jobs.json."
     }
 
     func saveSettings() {

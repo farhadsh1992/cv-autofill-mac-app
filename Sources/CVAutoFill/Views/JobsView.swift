@@ -1,7 +1,15 @@
 import SwiftUI
 
+enum JobsTab: String, CaseIterable, Identifiable {
+    case saved = "Saved Jobs"
+    case apply = "Apply Job"
+
+    var id: String { rawValue }
+}
+
 struct JobsView: View {
     @EnvironmentObject var state: AppState
+    @State private var tab: JobsTab = .saved
     @State private var newTitle = ""
     @State private var newCompany = ""
     @State private var newLocation = ""
@@ -11,37 +19,36 @@ struct JobsView: View {
     @State private var isError = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Applied Jobs").font(.title2)
-                Text("Track jobs you've applied to. Shares the same table columns as the browser extension's Jobs tab.")
-                    .foregroundStyle(.secondary)
-
-                Group {
-                    Text("Add a job").font(.headline)
-                    TextField("Job title", text: $newTitle)
-                    TextField("Company", text: $newCompany)
-                    TextField("Location", text: $newLocation)
-                    TextField("Link", text: $newLink)
-                    TextEditor(text: $newRequirements)
-                        .frame(minHeight: 60)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
-                        .overlay(alignment: .topLeading) {
-                            if newRequirements.isEmpty {
-                                Text("Requirements (short summary)")
-                                    .foregroundStyle(.tertiary)
-                                    .padding(.top, 8)
-                                    .padding(.leading, 5)
-                                    .allowsHitTesting(false)
-                            }
-                        }
-                    Button("Add job") { addJob() }
+        VStack(spacing: 0) {
+            Picker("", selection: $tab) {
+                ForEach(JobsTab.allCases) { t in
+                    Text(t.rawValue).tag(t)
                 }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding()
 
-                if !status.isEmpty { Text(status).foregroundStyle(isError ? .red : .green) }
+            switch tab {
+            case .saved: savedJobsTab
+            case .apply: applyJobTab
+            }
+        }
+        .navigationTitle("Jobs")
+        .onAppear {
+            if let message = state.lastAutoImportMessage {
+                status = message
+                isError = false
+                state.lastAutoImportMessage = nil
+            }
+        }
+    }
 
-                Divider()
+    // ---- Saved Jobs ----
 
+    private var savedJobsTab: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Saved jobs").font(.headline)
                     Spacer()
@@ -49,49 +56,62 @@ struct JobsView: View {
                     Button("Export Word + JSON") { exportFiles() }
                         .disabled(state.jobs.isEmpty)
                 }
-                Text("\"Upload from extension\" reads an \"applied jobs.json\" file saved by the browser extension's Save this job / Export, and adds those rows here alongside whatever's already in this table. \"Export Word + JSON\" saves \"applied jobs.docx\" and \"applied jobs.json\" straight to your Downloads folder — no dialog, each export overwrites the previous one.")
+                Text("\"Upload from extension\" reads an \"applied jobs.json\" file saved by the browser extension's Save this job / Export, and adds those rows here alongside whatever's already in this table (also checked automatically every time this app opens). \"Export Word + JSON\" saves \"applied jobs.docx\" and \"applied jobs.json\" straight to your Downloads folder — no dialog, each export overwrites the previous one.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-
-                if state.jobs.isEmpty {
-                    Text("None yet.").foregroundStyle(.secondary)
-                } else {
-                    ForEach(state.jobs.reversed()) { job in
-                        jobRow(job)
-                    }
-                }
+                if !status.isEmpty { Text(status).foregroundStyle(isError ? .red : .green).font(.footnote) }
             }
-            .padding()
+            .padding([.horizontal, .top])
+            .padding(.bottom, 8)
+
+            Divider()
+
+            jobsTable
         }
-        .navigationTitle("Jobs")
     }
 
-    private func jobRow(_ job: JobItem) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(job.title.isEmpty ? "(no title)" : job.title).bold()
-                    Text([job.company, job.location].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+    @ViewBuilder
+    private var jobsTable: some View {
+        if state.jobs.isEmpty {
+            VStack {
                 Spacer()
-                Button("Remove", role: .destructive) { remove(job) }
+                Text("No jobs saved yet.").foregroundStyle(.secondary)
+                Spacer()
             }
-            if !job.requirements.isEmpty {
-                Text(job.requirements).font(.footnote)
-            }
-            if !job.link.isEmpty, let url = URL(string: job.link) {
-                Link(job.link, destination: url).font(.footnote).lineLimit(1)
-            }
-            HStack {
-                Text("Results:").font(.footnote).foregroundStyle(.secondary)
-                TextField("e.g. Interviewed, Rejected, Offer...", text: resultsBinding(for: job))
-                    .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            // Same column order as the browser extension's Jobs tab / Word export.
+            Table(Array(state.jobs.reversed())) {
+                TableColumn("Job title") { job in Text(job.title) }
+                    .width(min: 110, ideal: 150)
+                TableColumn("Company") { job in Text(job.company) }
+                    .width(min: 90, ideal: 130)
+                TableColumn("Location") { job in Text(job.location) }
+                    .width(min: 90, ideal: 130)
+                TableColumn("Requirements") { job in Text(job.requirements).lineLimit(2) }
+                    .width(min: 160, ideal: 260)
+                TableColumn("Link") { job in linkCell(job) }
+                    .width(min: 100, ideal: 160)
+                TableColumn("Results") { job in
+                    TextField("e.g. Interviewed, Rejected, Offer...", text: resultsBinding(for: job))
+                        .textFieldStyle(.plain)
+                }
+                .width(min: 130, ideal: 180)
+                TableColumn("") { job in
+                    Button("Remove", role: .destructive) { remove(job) }
+                }
+                .width(70)
             }
         }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
+    }
+
+    @ViewBuilder
+    private func linkCell(_ job: JobItem) -> some View {
+        if !job.link.isEmpty, let url = URL(string: job.link) {
+            Link(job.link, destination: url).lineLimit(1)
+        } else {
+            Text("")
+        }
     }
 
     private func resultsBinding(for job: JobItem) -> Binding<String> {
@@ -103,6 +123,90 @@ struct JobsView: View {
                 state.saveJobs()
             }
         )
+    }
+
+    private func remove(_ job: JobItem) {
+        state.jobs.removeAll { $0.id == job.id }
+        state.saveJobs()
+    }
+
+    private func uploadFromExtension() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose the \"applied jobs.json\" file saved by the browser extension."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            guard let imported = JobsImport.parse(data) else {
+                status = "That doesn't look like an applied-jobs JSON file."
+                isError = true
+                return
+            }
+            let existingIds = Set(state.jobs.map(\.id))
+            let newOnes = imported.filter { !existingIds.contains($0.id) }
+            state.jobs.append(contentsOf: newOnes)
+            state.saveJobs()
+            status = "Added \(newOnes.count) job(s) from the extension" + (newOnes.count < imported.count ? " (\(imported.count - newOnes.count) already here)." : ".")
+            isError = false
+        } catch {
+            status = "Upload failed: \(error.localizedDescription)"
+            isError = true
+        }
+    }
+
+    private func exportFiles() {
+        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+            status = "Couldn't find your Downloads folder."
+            isError = true
+            return
+        }
+        do {
+            let docxData = DocxWriter.generateJobs(state.jobs)
+            try docxData.write(to: downloads.appendingPathComponent("applied jobs.docx"))
+
+            let jsonData = try JSONEncoder.pretty.encode(state.jobs)
+            try jsonData.write(to: downloads.appendingPathComponent("applied jobs.json"))
+
+            status = "Exported to Downloads."
+            isError = false
+        } catch {
+            status = error.localizedDescription
+            isError = true
+        }
+    }
+
+    // ---- Apply Job ----
+
+    private var applyJobTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Add a job").font(.title2)
+                Text("Log a job you're applying to — shows up in the Saved Jobs tab right away.")
+                    .foregroundStyle(.secondary)
+
+                TextField("Job title", text: $newTitle)
+                TextField("Company", text: $newCompany)
+                TextField("Location", text: $newLocation)
+                TextField("Link", text: $newLink)
+                TextEditor(text: $newRequirements)
+                    .frame(minHeight: 60)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+                    .overlay(alignment: .topLeading) {
+                        if newRequirements.isEmpty {
+                            Text("Requirements (short summary)")
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                Button("Add job") { addJob() }
+
+                if !status.isEmpty { Text(status).foregroundStyle(isError ? .red : .green) }
+            }
+            .padding()
+        }
     }
 
     private func addJob() {
@@ -125,79 +229,8 @@ struct JobsView: View {
         newLocation = ""
         newRequirements = ""
         newLink = ""
-        status = "Added."
+        status = "Added — see it in Saved Jobs."
         isError = false
-    }
-
-    private func remove(_ job: JobItem) {
-        state.jobs.removeAll { $0.id == job.id }
-        state.saveJobs()
-    }
-
-    private func uploadFromExtension() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.allowsMultipleSelection = false
-        panel.message = "Choose the \"applied jobs.json\" file saved by the browser extension."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try Data(contentsOf: url)
-            guard let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-                status = "That doesn't look like an applied-jobs JSON file."
-                isError = true
-                return
-            }
-            let imported: [JobItem] = array.map { o in
-                var job = JobItem()
-                job.id = (o["id"] as? String).flatMap { UUID(uuidString: $0) } ?? UUID()
-                job.title = o["title"] as? String ?? ""
-                job.company = o["company"] as? String ?? ""
-                job.location = o["location"] as? String ?? ""
-                job.requirements = o["requirements"] as? String ?? ""
-                job.link = o["link"] as? String ?? ""
-                job.results = o["results"] as? String ?? ""
-                job.addedAt = parseFlexibleDate(o["addedAt"]) ?? Date()
-                return job
-            }
-            let existingIds = Set(state.jobs.map(\.id))
-            let newOnes = imported.filter { !existingIds.contains($0.id) }
-            state.jobs.append(contentsOf: newOnes)
-            state.saveJobs()
-            status = "Added \(newOnes.count) job(s) from the extension" + (newOnes.count < imported.count ? " (\(imported.count - newOnes.count) already here)." : ".")
-            isError = false
-        } catch {
-            status = "Upload failed: \(error.localizedDescription)"
-            isError = true
-        }
-    }
-
-    // The extension writes addedAt as epoch-ms numbers; this app's own
-    // exports use ISO8601 strings — accept either.
-    private func parseFlexibleDate(_ value: Any?) -> Date? {
-        if let ms = value as? Double { return Date(timeIntervalSince1970: ms / 1000) }
-        if let ms = value as? Int { return Date(timeIntervalSince1970: Double(ms) / 1000) }
-        if let s = value as? String { return ISO8601DateFormatter().date(from: s) }
-        return nil
-    }
-
-    private func exportFiles() {
-        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
-            status = "Couldn't find your Downloads folder."
-            isError = true
-            return
-        }
-        do {
-            let docxData = DocxWriter.generateJobs(state.jobs)
-            try docxData.write(to: downloads.appendingPathComponent("applied jobs.docx"))
-
-            let jsonData = try JSONEncoder.pretty.encode(state.jobs)
-            try jsonData.write(to: downloads.appendingPathComponent("applied jobs.json"))
-
-            status = "Exported to Downloads."
-            isError = false
-        } catch {
-            status = error.localizedDescription
-            isError = true
-        }
+        tab = .saved
     }
 }

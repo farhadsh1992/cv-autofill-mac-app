@@ -154,25 +154,15 @@ enum Backup {
                     label: o["label"] as? String ?? "Note",
                     url: o["url"] as? String,
                     content: o["content"] as? String ?? "",
-                    addedAt: parseFlexibleDate(o["addedAt"]) ?? Date()
+                    addedAt: JobsImport.parseFlexibleDate(o["addedAt"]) ?? Date()
                 )
             }
             result.imported.append("Resources")
         }
 
-        if let jobsArr = dict["savedJobs"] as? [[String: Any]] {
-            state.jobs = jobsArr.map { o in
-                var job = JobItem()
-                job.id = (o["id"] as? String).flatMap { UUID(uuidString: $0) } ?? UUID()
-                job.title = o["title"] as? String ?? ""
-                job.company = o["company"] as? String ?? ""
-                job.location = o["location"] as? String ?? ""
-                job.requirements = o["requirements"] as? String ?? ""
-                job.link = o["link"] as? String ?? ""
-                job.results = o["results"] as? String ?? ""
-                job.addedAt = parseFlexibleDate(o["addedAt"]) ?? Date()
-                return job
-            }
+        if let jobsData = try? JSONSerialization.data(withJSONObject: dict["savedJobs"] ?? []),
+           let jobsArr = JobsImport.parse(jobsData) {
+            state.jobs = jobsArr
             result.imported.append("Applied jobs")
         }
 
@@ -192,14 +182,5 @@ enum Backup {
         state.saveJobs()
 
         return result
-    }
-
-    // The extension writes addedAt as epoch-ms numbers (JS Date.now()); this
-    // app's own exports use ISO8601 strings — accept either on import.
-    private static func parseFlexibleDate(_ value: Any?) -> Date? {
-        if let ms = value as? Double { return Date(timeIntervalSince1970: ms / 1000) }
-        if let ms = value as? Int { return Date(timeIntervalSince1970: Double(ms) / 1000) }
-        if let s = value as? String { return ISO8601DateFormatter().date(from: s) }
-        return nil
     }
 }

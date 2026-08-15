@@ -34,14 +34,20 @@ why, and how to move data between them manually if you want to).
 - **Resources** — free-form "about me" notes, plus links to your own
   websites (fetched once, content saved as extra context for every AI
   call above).
-- **Jobs** — a table of jobs you've applied to (title, company, location,
-  requirements, link, and a results field you fill in yourself — interview,
-  rejected, offer, whatever). Add rows manually, edit Results inline, remove
-  any time. "Upload from extension" reads an `applied jobs.json` file saved
-  by the browser extension's Save this job / Export and adds those rows here
-  alongside whatever's already in the table (skips ones already present, by
-  id — safe to re-upload the same file). "Export Word + JSON" writes
-  `applied jobs.docx` (the same landscape table format) and
+- **Jobs** — two tabs, **Saved Jobs** and **Apply Job**. Saved Jobs shows
+  every job you've logged in a real table (same columns, same order, as the
+  browser extension's own Jobs tab: title, company, location, requirements,
+  link, results) — Results is editable right in the table, rows are
+  removable. Apply Job is a short form (title, company, location, link,
+  requirements) for logging a new one; saving jumps you back to Saved Jobs
+  so you see it land. "Upload from extension" reads an `applied jobs.json`
+  file saved by the browser extension's Save this job / Export and adds
+  those rows in, skipping ones already present by id — safe to re-upload the
+  same file. **The same check runs automatically every time this app
+  launches**: if there's an `applied jobs.json` sitting in Downloads, new
+  rows in it get pulled in without asking, so saving a job from the browser
+  and then opening this app is enough to see it here. "Export Word + JSON"
+  writes `applied jobs.docx` (the same landscape table format) and
   `applied jobs.json` straight to your Downloads folder — no dialog,
   overwriting the previous export each time.
 - **Settings** — API keys, models, appearance, and a running usage/cost
@@ -157,6 +163,9 @@ Sources/CVAutoFill/
   DocxStyleExtractor.swift        Hand-rolled ZIP reader — pulls a photo + accent color out of an uploaded .docx
   DocumentIO.swift                PDFKit/NSAttributedString text extraction, CoreText PDF export
   ColorHex.swift                  Color <-> hex helpers for the accent-color picker
+  Backup.swift                    Export/Import backup — reads/writes the extension's backup JSON shape
+  JobsImport.swift                Parses the extension's applied-jobs.json array; shared by the manual
+                                   upload button, launch-time auto-import, and Backup's savedJobs import
   Resources/logo.png              Bundled app logo (shown in the sidebar footer)
   Views/                          One view per sidebar section, plus SidebarFooter in ContentView.swift
 ```
