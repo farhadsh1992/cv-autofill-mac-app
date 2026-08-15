@@ -108,7 +108,13 @@ struct JobsView: View {
     @ViewBuilder
     private func linkCell(_ job: JobItem) -> some View {
         if !job.link.isEmpty, let url = URL(string: job.link) {
-            Link(job.link, destination: url).lineLimit(1)
+            Button {
+                NSWorkspace.shared.open(url)
+            } label: {
+                Image(systemName: "arrow.up.right.square")
+            }
+            .buttonStyle(.plain)
+            .help(job.link)
         } else {
             Text("")
         }

@@ -44,7 +44,11 @@ private struct AppButtonStyle: ViewModifier {
     func body(content: Content) -> some View {
         switch style {
         case .normal:
-            content.buttonStyle(.automatic)
+            // .automatic bordered buttons on macOS mostly ignore .tint() for
+            // their fill (just a subtle border/text tint) — .borderedProminent
+            // is the style that actually paints the tint color as a solid
+            // background, which is what the Appearance color picker implies.
+            content.buttonStyle(.borderedProminent)
         case .glass:
             if #available(macOS 26.0, *) {
                 content.buttonStyle(.glass)

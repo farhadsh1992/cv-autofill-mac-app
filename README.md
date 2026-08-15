@@ -37,8 +37,9 @@ why, and how to move data between them manually if you want to).
 - **Jobs** — two tabs, **Saved Jobs** and **Apply Job**. Saved Jobs shows
   every job you've logged in a real table (same columns, same order, as the
   browser extension's own Jobs tab: title, company, location, requirements,
-  link, results) — Results is editable right in the table, rows are
-  removable. Apply Job is a short form (title, company, location, link,
+  link, results) — Link is a small "open" button instead of the raw URL
+  (some job links are enormous), Results is editable right in the table,
+  rows are removable. Apply Job is a short form (title, company, location, link,
   requirements) for logging a new one; saving jumps you back to Saved Jobs
   so you see it land. "Upload from extension" reads an `applied jobs.json`
   file saved by the browser extension's Save this job / Export and adds
@@ -53,13 +54,17 @@ why, and how to move data between them manually if you want to).
 - **Settings** — API keys, models, appearance, and a running usage/cost
   summary.
 
-## Both providers, at once
+## Four providers, at once
 
-OpenAI and Anthropic can both be configured simultaneously in Settings —
-both API keys, both model choices, live side by side. **Generate** has its
-own provider/model picker so you choose which one to use per request; **Ask
-AI** and CV parsing use whichever one is set as the "Default provider" in
-Settings.
+OpenAI, Anthropic, Kimi (Moonshot), and Gemini (Google) can all be
+configured simultaneously in Settings → AI — all four API keys, all four
+model choices, live side by side. **Generate** has its own provider/model
+picker so you choose which one to use per request; **Ask AI** and CV
+parsing use whichever one is set as the "Default provider" in Settings.
+(Unlike the browser extension, this app never sends a PDF to the AI at all
+— CVs and cover letters are extracted locally via PDFKit first — so Kimi's
+lack of PDF support, a real limitation on the extension side, doesn't apply
+here.)
 
 Settings also shows a running **usage summary** per provider/model — total
 tokens (exact, from each API response) and an estimated dollar cost. The
@@ -72,11 +77,13 @@ provider — treat it as a rough guide, not your actual bill.
 Settings is split into three tabs: **Appearance**, **AI**, **Backup**.
 
 Appearance has a Theme picker (System/Light/Dark), a button color picker
-(defaults to the app's brand red, `#9E230B`), and a button style choice:
-**Normal** (standard macOS bordered buttons) or **Glass** — macOS 26
-"Tahoe"'s Liquid Glass button material. Verified against the actual
-installed macOS 26 SDK rather than guessed; falls back to Normal
-automatically on older macOS.
+(defaults to the app's brand red, `#9E230B`; uses `.borderedProminent` so
+the picked color actually fills the button background — plain `.automatic`
+bordered buttons on macOS mostly ignore `.tint()` for their fill), and a
+button style choice: **Normal** (standard macOS bordered buttons) or
+**Glass** — macOS 26 "Tahoe"'s Liquid Glass button material. Verified
+against the actual installed macOS 26 SDK rather than guessed; falls back
+to Normal automatically on older macOS.
 
 ## Extension vs. app
 
@@ -157,7 +164,8 @@ Sources/CVAutoFill/
   Usage.swift                     Token/cost tracking, model catalog, price table
   Storage.swift                   Application Support JSON/text files + Keychain
   Prompts.swift                   Ported verbatim from the extension's background.js
-  AIClient.swift                  OpenAI Responses API / Anthropic Messages API, per-request provider+model
+  AIClient.swift                  OpenAI/Anthropic/Kimi/Gemini APIs, per-request provider+model — text
+                                   prompts only, no PDF (CVs are extracted locally via DocumentIO.swift)
   DocxWriter.swift                Ported from the extension's lib/docx-writer.js — CV template with photo/color
                                    embedding, plus generateJobs() for the applied-jobs table export
   DocxStyleExtractor.swift        Hand-rolled ZIP reader — pulls a photo + accent color out of an uploaded .docx

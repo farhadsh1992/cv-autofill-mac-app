@@ -11,6 +11,8 @@ final class AppState: ObservableObject {
     @Published var jobs: [JobItem]
     @Published var openaiApiKey: String
     @Published var anthropicApiKey: String
+    @Published var kimiApiKey: String
+    @Published var geminiApiKey: String
     @Published var usage: UsageLog
     @Published var cvStyle: DocxStyle
     @Published var lastAutoImportMessage: String?
@@ -24,6 +26,8 @@ final class AppState: ObservableObject {
         jobs = Storage.loadJSON([JobItem].self, from: "jobs.json") ?? []
         openaiApiKey = Keychain.get(forKey: "openaiApiKey") ?? ""
         anthropicApiKey = Keychain.get(forKey: "anthropicApiKey") ?? ""
+        kimiApiKey = Keychain.get(forKey: "kimiApiKey") ?? ""
+        geminiApiKey = Keychain.get(forKey: "geminiApiKey") ?? ""
         usage = Storage.loadJSON(UsageLog.self, from: "usage.json") ?? UsageLog()
         cvStyle = AppState.loadCVStyle()
         autoImportJobsFromDownloads()
@@ -49,6 +53,8 @@ final class AppState: ObservableObject {
         Storage.saveJSON(settings, to: "settings.json")
         Keychain.set(openaiApiKey, forKey: "openaiApiKey")
         Keychain.set(anthropicApiKey, forKey: "anthropicApiKey")
+        Keychain.set(kimiApiKey, forKey: "kimiApiKey")
+        Keychain.set(geminiApiKey, forKey: "geminiApiKey")
     }
 
     func saveCV() {
@@ -103,7 +109,12 @@ final class AppState: ObservableObject {
     }
 
     func modelFor(_ provider: Provider) -> String {
-        provider == .openai ? settings.openaiModel : settings.anthropicModel
+        switch provider {
+        case .openai: return settings.openaiModel
+        case .anthropic: return settings.anthropicModel
+        case .kimi: return settings.kimiModel
+        case .gemini: return settings.geminiModel
+        }
     }
 
     /// Builds a client for a specific provider/model, wired to record token
@@ -125,27 +136,18 @@ final class AppState: ObservableObject {
     }
 
     func recordUsage(provider: Provider, model: String, input: Int, output: Int) {
-        var stats: UsageStats
-        switch provider {
-        case .openai:
-            stats = usage.openai[model] ?? UsageStats()
-            stats.inputTokens += input
-            stats.outputTokens += output
-            stats.requestCount += 1
-            usage.openai[model] = stats
-        case .anthropic:
-            stats = usage.anthropic[model] ?? UsageStats()
-            stats.inputTokens += input
-            stats.outputTokens += output
-            stats.requestCount += 1
-            usage.anthropic[model] = stats
-        }
+        var dict = usage.dict(for: provider)
+        var stats = dict[model] ?? UsageStats()
+        stats.inputTokens += input
+        stats.outputTokens += output
+        stats.requestCount += 1
+        dict[model] = stats
+        usage.setDict(dict, for: provider)
         Storage.saveJSON(usage, to: "usage.json")
     }
 
     func usageEntries(for provider: Provider) -> [UsageEntry] {
-        let dict = provider == .openai ? usage.openai : usage.anthropic
-        return dict
+        usage.dict(for: provider)
             .map { model, stats in
                 UsageEntry(model: model, stats: stats, estimatedCost: Pricing.estimateCost(
                     provider: provider, model: model, inputTokens: stats.inputTokens, outputTokens: stats.outputTokens

@@ -113,6 +113,17 @@ struct JobItem: Codable, Identifiable, Equatable {
 enum Provider: String, Codable, CaseIterable, Hashable {
     case openai
     case anthropic
+    case kimi
+    case gemini
+
+    var displayName: String {
+        switch self {
+        case .openai: return "OpenAI"
+        case .anthropic: return "Anthropic"
+        case .kimi: return "Kimi"
+        case .gemini: return "Gemini"
+        }
+    }
 }
 
 enum AppearanceMode: String, Codable, CaseIterable, Hashable {
@@ -124,15 +135,37 @@ enum ButtonStyleChoice: String, Codable, CaseIterable, Hashable {
 }
 
 struct AppSettings: Codable, Equatable {
-    // Both providers can be configured and used at the same time now — this
+    // All four providers can be configured and used at the same time — this
     // is just which one pre-fills the picker in Generate/Ask AI on launch.
     var defaultProvider: Provider = .openai
     var openaiModel: String = "gpt-4o-mini"
     var anthropicModel: String = "claude-sonnet-5"
+    var kimiModel: String = "kimi-k2.5"
+    var geminiModel: String = "gemini-3.5-flash"
 
     var appearanceMode: AppearanceMode = .system
     var accentColorHex: String = "#27A6F5"
     var buttonStyle: ButtonStyleChoice = .normal
+
+    init() {}
+
+    // kimiModel/geminiModel were added after this struct started shipping —
+    // a plain synthesized decoder throws keyNotFound on an existing
+    // settings.json that predates them (verified: Swift's Codable synthesis
+    // does NOT fall back to a property's default value for a missing key,
+    // only for a present-but-null one), which would silently reset every
+    // other setting via the `?? AppSettings()` fallback in AppState.init().
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        defaultProvider = try c.decodeIfPresent(Provider.self, forKey: .defaultProvider) ?? .openai
+        openaiModel = try c.decodeIfPresent(String.self, forKey: .openaiModel) ?? "gpt-4o-mini"
+        anthropicModel = try c.decodeIfPresent(String.self, forKey: .anthropicModel) ?? "claude-sonnet-5"
+        kimiModel = try c.decodeIfPresent(String.self, forKey: .kimiModel) ?? "kimi-k2.5"
+        geminiModel = try c.decodeIfPresent(String.self, forKey: .geminiModel) ?? "gemini-3.5-flash"
+        appearanceMode = try c.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? .system
+        accentColorHex = try c.decodeIfPresent(String.self, forKey: .accentColorHex) ?? "#27A6F5"
+        buttonStyle = try c.decodeIfPresent(ButtonStyleChoice.self, forKey: .buttonStyle) ?? .normal
+    }
 }
 
 extension JSONEncoder {

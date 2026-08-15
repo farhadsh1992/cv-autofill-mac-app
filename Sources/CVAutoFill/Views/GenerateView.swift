@@ -22,10 +22,12 @@ struct GenerateView: View {
                 HStack {
                     Picker("Use", selection: $selectedProvider) {
                         Text("OpenAI").tag(Provider.openai)
-                        Text("Anthropic (Claude)").tag(Provider.anthropic)
+                        Text("Anthropic").tag(Provider.anthropic)
+                        Text("Kimi").tag(Provider.kimi)
+                        Text("Gemini").tag(Provider.gemini)
                     }
                     .pickerStyle(.segmented)
-                    .frame(maxWidth: 280)
+                    .frame(maxWidth: 360)
 
                     Picker("Model", selection: $selectedModel) {
                         ForEach(ModelCatalog.models(for: selectedProvider), id: \.self) { m in

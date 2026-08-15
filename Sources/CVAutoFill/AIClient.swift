@@ -31,12 +31,14 @@ struct AIClient {
         self.onUsage = onUsage
     }
 
-    private var providerName: String { provider == .openai ? "OpenAI" : "Anthropic" }
+    private var providerName: String { provider.displayName }
 
     private func apiKey() -> String? {
         switch provider {
         case .openai: return Keychain.get(forKey: "openaiApiKey")
         case .anthropic: return Keychain.get(forKey: "anthropicApiKey")
+        case .kimi: return Keychain.get(forKey: "kimiApiKey")
+        case .gemini: return Keychain.get(forKey: "geminiApiKey")
         }
     }
 
@@ -50,6 +52,8 @@ struct AIClient {
         switch provider {
         case .openai: return try await callOpenAI(apiKey: key, prompt: prompt)
         case .anthropic: return try await callAnthropic(apiKey: key, prompt: prompt)
+        case .kimi: return try await callKimi(apiKey: key, prompt: prompt)
+        case .gemini: return try await callGemini(apiKey: key, prompt: prompt)
         }
     }
 
@@ -129,6 +133,71 @@ struct AIClient {
             for c in content where c["type"] as? String == "text" {
                 text += (c["text"] as? String) ?? ""
             }
+        }
+        return try parseJSONLoose(text)
+    }
+
+    // Kimi (Moonshot) exposes an OpenAI-compatible chat completions endpoint.
+    private func callKimi(apiKey: String, prompt: String) async throws -> [String: Any] {
+        var request = URLRequest(url: URL(string: "https://api.moonshot.ai/v1/chat/completions")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let body: [String: Any] = [
+            "model": model,
+            "messages": [["role": "user", "content": prompt]],
+            "response_format": ["type": "json_object"],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AIError.badResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let text = String(data: data, encoding: .utf8) ?? ""
+            throw AIError.apiError("Kimi API error \(http.statusCode): \(text.prefix(300))")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AIError.badResponse
+        }
+        if let usage = json["usage"] as? [String: Any] {
+            let input = (usage["prompt_tokens"] as? Int) ?? 0
+            let output = (usage["completion_tokens"] as? Int) ?? 0
+            onUsage?(input, output)
+        }
+        let text = ((json["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any])?["content"] as? String ?? ""
+        return try parseJSONLoose(text)
+    }
+
+    private func callGemini(apiKey: String, prompt: String) async throws -> [String: Any] {
+        var request = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+        let body: [String: Any] = [
+            "contents": [["role": "user", "parts": [["text": prompt]]]],
+            "generationConfig": ["responseMimeType": "application/json"],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AIError.badResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let text = String(data: data, encoding: .utf8) ?? ""
+            throw AIError.apiError("Gemini API error \(http.statusCode): \(text.prefix(300))")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AIError.badResponse
+        }
+        if let usage = json["usageMetadata"] as? [String: Any] {
+            let input = (usage["promptTokenCount"] as? Int) ?? 0
+            let output = (usage["candidatesTokenCount"] as? Int) ?? 0
+            onUsage?(input, output)
+        }
+        var text = ""
+        if let candidates = json["candidates"] as? [[String: Any]],
+           let content = candidates.first?["content"] as? [String: Any],
+           let parts = content["parts"] as? [[String: Any]] {
+            for p in parts { text += (p["text"] as? String) ?? "" }
         }
         return try parseJSONLoose(text)
     }

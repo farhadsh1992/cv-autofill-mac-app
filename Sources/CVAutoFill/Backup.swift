@@ -2,11 +2,10 @@ import Foundation
 
 // Reads/writes the same JSON shape as the browser extension's Options →
 // Info → Backup (Export/Import backup) — cv-autofill-backup.json. The two
-// apps' internal models differ in a few places (this app only supports
-// OpenAI/Anthropic, not Kimi/Gemini; About Me is a single text field here,
-// not labeled notes; there's no Addresses feature here at all) — import
-// pulls in whatever maps cleanly and reports the rest as skipped rather
-// than silently dropping or mangling it.
+// apps' internal models differ in a couple of places (About Me is a single
+// text field here, not labeled notes; there's no Addresses feature here at
+// all) — import pulls in whatever maps cleanly and reports the rest as
+// skipped rather than silently dropping or mangling it.
 //
 // Built with plain [String: Any] dictionaries + JSONSerialization instead
 // of matching Codable structs, since the two schemas aren't identical and
@@ -26,6 +25,8 @@ enum Backup {
         dict["providers"] = [
             "openai": ["apiKey": state.openaiApiKey, "model": state.settings.openaiModel],
             "anthropic": ["apiKey": state.anthropicApiKey, "model": state.settings.anthropicModel],
+            "kimi": ["apiKey": state.kimiApiKey, "model": state.settings.kimiModel],
+            "gemini": ["apiKey": state.geminiApiKey, "model": state.settings.geminiModel],
         ]
         dict["activeProvider"] = state.settings.defaultProvider.rawValue
 
@@ -101,8 +102,15 @@ enum Backup {
                 if let model = anthropic["model"] as? String, !model.isEmpty { state.settings.anthropicModel = model }
                 result.imported.append("Anthropic key/model")
             }
-            if providers["kimi"] != nil || providers["gemini"] != nil {
-                result.skipped.append("Kimi/Gemini keys (not supported in this app)")
+            if let kimi = providers["kimi"] as? [String: Any] {
+                if let key = kimi["apiKey"] as? String, !key.isEmpty { state.kimiApiKey = key }
+                if let model = kimi["model"] as? String, !model.isEmpty { state.settings.kimiModel = model }
+                result.imported.append("Kimi key/model")
+            }
+            if let gemini = providers["gemini"] as? [String: Any] {
+                if let key = gemini["apiKey"] as? String, !key.isEmpty { state.geminiApiKey = key }
+                if let model = gemini["model"] as? String, !model.isEmpty { state.settings.geminiModel = model }
+                result.imported.append("Gemini key/model")
             }
         }
         if let activeProvider = dict["activeProvider"] as? String, let p = Provider(rawValue: activeProvider) {

@@ -74,13 +74,15 @@ struct SettingsView: View {
     @ViewBuilder
     private var aiSection: some View {
         Section {
-            Text("Neither OpenAI nor Anthropic offer a public account-login flow for third-party apps — the ChatGPT/Claude.ai subscription login is separate from their developer APIs. An API key, billed per call, is the supported way to connect. Both providers can be set up at once — pick which one to use per generation.")
+            Text("None of these offer a public account-login flow for third-party apps — their consumer chat subscriptions are separate from their developer APIs. An API key, billed per call, is the supported way to connect. All four can be set up at once — pick which one to use per generation.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             Picker("Default provider", selection: $state.settings.defaultProvider) {
                 Text("OpenAI").tag(Provider.openai)
-                Text("Anthropic (Claude)").tag(Provider.anthropic)
+                Text("Anthropic").tag(Provider.anthropic)
+                Text("Kimi").tag(Provider.kimi)
+                Text("Gemini").tag(Provider.gemini)
             }
             .pickerStyle(.segmented)
             Text("Pre-fills the picker in Generate — you can still switch providers per action there.")
@@ -119,15 +121,45 @@ struct SettingsView: View {
         }
 
         Section {
+            SecureField("sk-...", text: $state.kimiApiKey)
+            Picker("Model", selection: $state.settings.kimiModel) {
+                ForEach(ModelCatalog.kimi, id: \.self) { m in
+                    Text(ModelCatalog.displayName(m)).tag(m)
+                }
+            }
+            Link("Get an API key at platform.moonshot.ai/console/api-keys", destination: URL(string: "https://platform.moonshot.ai/console/api-keys")!)
+                .font(.footnote)
+            Text("If your account is on Moonshot's mainland-China platform instead, its keys are issued for api.moonshot.cn and won't work here.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            UsageSummary(provider: .kimi)
+        } header: {
+            Text("Kimi (Moonshot)").font(.headline)
+        }
+
+        Section {
+            SecureField("AIza...", text: $state.geminiApiKey)
+            Picker("Model", selection: $state.settings.geminiModel) {
+                ForEach(ModelCatalog.gemini, id: \.self) { m in
+                    Text(ModelCatalog.displayName(m)).tag(m)
+                }
+            }
+            Link("Get an API key at aistudio.google.com/apikey", destination: URL(string: "https://aistudio.google.com/apikey")!)
+                .font(.footnote)
+            UsageSummary(provider: .gemini)
+        } header: {
+            Text("Gemini (Google)").font(.headline)
+        }
+
+        Section {
             HStack {
                 Button("Save") {
-                    if state.openaiApiKey.contains("://") {
-                        status = "The OpenAI API key field has a URL in it, not a key — paste the actual sk-... key instead."
-                        isError = true
-                        return
-                    }
-                    if state.anthropicApiKey.contains("://") {
-                        status = "The Anthropic API key field has a URL in it, not a key — paste the actual sk-ant-... key instead."
+                    let checks: [(String, String)] = [
+                        (state.openaiApiKey, "OpenAI"), (state.anthropicApiKey, "Anthropic"),
+                        (state.kimiApiKey, "Kimi"), (state.geminiApiKey, "Gemini"),
+                    ]
+                    for (key, name) in checks where key.contains("://") {
+                        status = "The \(name) API key field has a URL in it, not a key — paste the actual key instead."
                         isError = true
                         return
                     }
@@ -146,7 +178,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var backupSection: some View {
         Section {
-            Text("Reads and writes the same JSON format as the browser extension's Options → Info → Backup — export from one, import into the other, to move your CV, resources, applied jobs, and API keys across. Not automatic: run this whenever you want the two back in sync. A few things don't carry over either way — addresses and Kimi/Gemini keys aren't supported in this app yet, and About Me notes get merged into this app's single text field.")
+            Text("Reads and writes the same JSON format as the browser extension's Options → Info → Backup — export from one, import into the other, to move your CV, resources, applied jobs, and API keys (all four providers) across. Not automatic: run this whenever you want the two back in sync. A couple of things don't carry over either way — Addresses aren't supported in this app yet, and About Me notes get merged into this app's single text field.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HStack {
