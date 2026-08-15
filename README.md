@@ -1,3 +1,5 @@
+<img src="assets/logo.png" alt="Farhad's CV AutoFill logo" width="160" />
+
 # Farhad's CV AutoFill (Mac app)
 
 A native macOS app for managing your CV, cover letter, and job-application
