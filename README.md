@@ -36,8 +36,10 @@ why, and how to move data between them manually if you want to).
   call above).
 - **Jobs** — two tabs, **Saved Jobs** and **Apply Job**. Saved Jobs shows
   every job you've logged in a real table (same columns, same order, as the
-  browser extension's own Jobs tab: title, company, location, requirements,
-  link, results) — Link is a small "open" button instead of the raw URL
+  browser extension's own Jobs tab: title, company, date, location,
+  requirements, link, results) — Date is the day the job was saved
+  (`YYYY-MM-DD`, always computed in UTC so the same timestamp shows the same
+  date on both sides), Link is a small "open" button instead of the raw URL
   (some job links are enormous), Results is editable right in the table,
   rows are removable. Apply Job is a short form (title, company, location, link,
   requirements) for logging a new one; saving jumps you back to Saved Jobs

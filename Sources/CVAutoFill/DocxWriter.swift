@@ -277,11 +277,26 @@ enum DocxWriter {
     }
 
     /// jobs: applied-job rows for the landscape table export.
+    // "2026-08-15" in UTC — matches the extension's `.toISOString().slice(0,10)`
+    // exactly (JS's toISOString is always UTC, not local time), so the same
+    // addedAt timestamp formats to the same date string on either side —
+    // otherwise a job saved late at night could show different days in the
+    // two apps' tables depending on which side of midnight UTC it landed on.
+    private static let jobDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
     static func generateJobs(_ jobs: [JobItem]) -> Data {
-        let headers = ["Job title", "Company", "Location", "Requirements", "Link", "Results"]
+        let headers = ["Job title", "Company", "Date", "Location", "Requirements", "Link", "Results"]
         // dxa (twentieths of a point); landscape letter minus 1" margins each side = 13680 dxa available.
-        let widths = [1800, 1600, 1400, 4480, 2400, 2000]
-        let rows = jobs.map { [$0.title, $0.company, $0.location, $0.requirements, $0.link, $0.results] }
+        let widths = [1700, 1500, 1300, 1300, 4000, 2180, 1700]
+        let rows = jobs.map {
+            [$0.title, $0.company, jobDateFormatter.string(from: $0.addedAt), $0.location, $0.requirements, $0.link, $0.results]
+        }
 
         let paragraphs = [
             paragraph([Run(text: "Applied Jobs", bold: true, size: 32)], spacingAfter: 200),

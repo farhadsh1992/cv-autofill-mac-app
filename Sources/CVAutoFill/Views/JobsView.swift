@@ -18,6 +18,16 @@ struct JobsView: View {
     @State private var status = ""
     @State private var isError = false
 
+    // "2026-08-15" in UTC — matches the extension's date format exactly (see
+    // DocxWriter.jobDateFormatter for why UTC, not local time).
+    static let jobDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $tab) {
@@ -86,6 +96,8 @@ struct JobsView: View {
                     .width(min: 110, ideal: 150)
                 TableColumn("Company") { job in Text(job.company) }
                     .width(min: 90, ideal: 130)
+                TableColumn("Date") { job in Text(Self.jobDateFormatter.string(from: job.addedAt)) }
+                    .width(min: 80, ideal: 90)
                 TableColumn("Location") { job in Text(job.location) }
                     .width(min: 90, ideal: 130)
                 TableColumn("Requirements") { job in Text(job.requirements).lineLimit(2) }
