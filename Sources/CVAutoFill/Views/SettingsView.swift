@@ -4,6 +4,8 @@ struct SettingsView: View {
     @EnvironmentObject var state: AppState
     @State private var status = ""
     @State private var isError = false
+    @State private var backupStatus = ""
+    @State private var backupIsError = false
 
     var body: some View {
         Form {
@@ -104,9 +106,72 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Text("Reads and writes the same JSON format as the browser extension's Options → Info → Backup — export from one, import into the other, to move your CV, resources, applied jobs, and API keys across. Not automatic: run this whenever you want the two back in sync. A few things don't carry over either way — addresses and Kimi/Gemini keys aren't supported in this app yet, and About Me notes get merged into this app's single text field.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Button("Export backup") { exportBackup() }
+                    Button("Import backup") { importBackup() }
+                }
+                if !backupStatus.isEmpty {
+                    Text(backupStatus).foregroundStyle(backupIsError ? .red : .secondary).font(.footnote)
+                }
+                Text("This file contains your API keys in plain text — keep it private, never commit it to a Git repo or share it.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Backup").font(.headline)
+            }
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
+    }
+
+    private func exportBackup() {
+        let dict = Backup.exportDictionary(state: state)
+        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]) else {
+            backupStatus = "Couldn't build the backup file."
+            backupIsError = true
+            return
+        }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "cv-autofill-backup.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try data.write(to: url)
+            backupStatus = "Exported."
+            backupIsError = false
+        } catch {
+            backupStatus = error.localizedDescription
+            backupIsError = true
+        }
+    }
+
+    private func importBackup() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                backupStatus = "That file doesn't look like a backup from this app or the extension."
+                backupIsError = true
+                return
+            }
+            let result = Backup.apply(dict, to: state)
+            var summary = result.imported.isEmpty ? "Nothing recognizable to import." : "Imported: \(result.imported.joined(separator: ", "))."
+            if !result.skipped.isEmpty {
+                summary += " Skipped: \(result.skipped.joined(separator: ", "))."
+            }
+            backupStatus = summary
+            backupIsError = result.imported.isEmpty
+        } catch {
+            backupStatus = "Import failed: \(error.localizedDescription)"
+            backupIsError = true
+        }
     }
 
     private var glassNote: String {

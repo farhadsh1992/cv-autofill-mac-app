@@ -96,7 +96,8 @@ inside the browser's own profile) are completely separate — a browser
 extension has no API to read/write an arbitrary native app's files, and a
 native app has no access to browser extension storage either. Nothing here
 syncs automatically between the two today; each keeps its own CV, jobs,
-etc. independently.
+etc. independently. **Settings → Backup** (Export/Import) is the way to move
+data between them manually — see that section above.
 
 ## Build & run
 
