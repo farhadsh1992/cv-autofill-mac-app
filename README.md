@@ -1,4 +1,6 @@
-<img src="assets/logo.png" alt="Farhad's CV AutoFill logo" width="160" />
+<p align="center">
+  <img src="assets/logo.png" alt="Farhad's CV AutoFill logo" width="160" />
+</p>
 
 # Farhad's CV AutoFill (Mac app)
 
