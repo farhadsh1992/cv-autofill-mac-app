@@ -12,11 +12,15 @@ struct AskView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Ask AI directly").font(.title2)
-            Text("For when a form question is unclear or your CV doesn't obviously answer it. Uses your saved CV and resources as context, via your default provider (change it in Settings, or per-request in Generate).")
+            Text("For when a form question is unclear or your CV doesn't obviously answer it. Uses your saved CV and resources as context, via the \"Other\" provider set in Settings → AI.")
                 .foregroundStyle(.secondary)
             TextEditor(text: $question)
                 .frame(minHeight: 100)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+
+            if state.settings.other.provider.isCLIBased {
+                CLITerminalToggle()
+            }
 
             HStack {
                 Button("Ask") { Task { await ask() } }.disabled(busy)
@@ -48,7 +52,7 @@ struct AskView: View {
         status = "Asking..."
         isError = false
         do {
-            answer = try await state.defaultAIClient.ask(question: question, cvData: state.cvData, context: state.contextBlock())
+            answer = try await state.defaultAIClient.ask(question: question, cvData: state.cvData, context: state.contextBlock(), promptOverride: state.promptOverrides.ask)
             status = ""
         } catch {
             status = error.localizedDescription

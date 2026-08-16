@@ -8,6 +8,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case coverLetter = "Cover letter"
     case resources = "Resources"
     case jobs = "Jobs"
+    case prompts = "Prompts"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -20,6 +21,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask: return "bubble.left.and.bubble.right"
         case .resources: return "link"
         case .jobs: return "briefcase"
+        case .prompts: return "note.text"
         case .settings: return "gearshape"
         }
     }
@@ -32,27 +34,80 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(SidebarItem.allCases, selection: $selection) { item in
-                Label(item.rawValue, systemImage: item.systemImage).tag(item)
+                Label(item.rawValue, systemImage: item.systemImage)
+                    .foregroundStyle(
+                        selection == item
+                            ? Color(hex: state.settings.menuTextColorHex)
+                            : Color.primary
+                    )
+                    .tag(item)
+                    // The sidebar's native row-selection highlight follows the
+                    // system accent color and ignores both .tint() and
+                    // .listItemTint() here — .listRowBackground is what
+                    // actually replaces it with a custom color.
+                    .listRowBackground(
+                        selection == item
+                            ? Color(hex: state.settings.accentColorHex)
+                            : Color.clear
+                    )
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
             .safeAreaInset(edge: .bottom) {
                 SidebarFooter()
             }
+            .modifier(GlassPanelBackground(enabled: state.settings.windowStyle == .glass))
         } detail: {
-            Group {
-                switch selection {
-                case .cv: CVView()
-                case .coverLetter: CoverLetterView()
-                case .generate: GenerateView()
-                case .ask: AskView()
-                case .resources: ResourcesView()
-                case .jobs: JobsView()
-                case .settings: SettingsView()
-                case .none: Text("Select a section").foregroundStyle(.secondary)
+            HStack(spacing: 0) {
+                Group {
+                    switch selection {
+                    case .cv: CVView()
+                    case .coverLetter: CoverLetterView()
+                    case .generate: GenerateView()
+                    case .ask: AskView()
+                    case .resources: ResourcesView()
+                    case .jobs: JobsView()
+                    case .prompts: PromptsView()
+                    case .settings: SettingsView()
+                    case .none: Text("Select a section").foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .textSelection(.enabled)
+                .modifier(GlassPanelBackground(enabled: state.settings.windowStyle == .glass))
+
+                if state.cliTerminalVisible {
+                    Divider()
+                    CLITerminalPanel()
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .textSelection(.enabled)
+        }
+    }
+}
+
+// Background-only glass, applied per-panel (sidebar and detail separately) —
+// NOT wrapping the whole NavigationSplitView in one glass shape, which
+// previously broke layout (see CVAutoFillApp.swift). Each panel already has
+// its own bounded frame here, so glassEffect just paints behind it instead
+// of taking part in the split view's own layout negotiation.
+//
+// .background(alignment:content:) ignores safe areas on every edge by
+// default, so the glass rectangle would otherwise extend up under the
+// window's title bar / toolbar strip and visibly change it. Explicitly
+// ignoring only the leading/trailing/bottom edges (and NOT .top) keeps the
+// glass stopped right below the title bar, leaving it untouched.
+private struct GlassPanelBackground: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled, #available(macOS 26.0, *) {
+            content.background {
+                Rectangle()
+                    .fill(.clear)
+                    .glassEffect(.regular, in: Rectangle())
+                    .ignoresSafeArea(edges: [.leading, .trailing, .bottom])
+            }
+        } else {
+            content
         }
     }
 }

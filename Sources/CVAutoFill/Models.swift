@@ -134,6 +134,8 @@ enum Provider: String, Codable, CaseIterable, Hashable {
     case anthropic
     case kimi
     case gemini
+    case claudeCode
+    case openaiCode
 
     var displayName: String {
         switch self {
@@ -141,7 +143,15 @@ enum Provider: String, Codable, CaseIterable, Hashable {
         case .anthropic: return "Anthropic"
         case .kimi: return "Kimi"
         case .gemini: return "Gemini"
+        case .claudeCode: return "Claude Code (Terminal)"
+        case .openaiCode: return "OpenAI Codex (Terminal)"
         }
+    }
+
+    /// Providers that shell out to a local CLI (Pro/Max or Plus/Pro
+    /// subscription login) instead of calling an HTTP API with a key.
+    var isCLIBased: Bool {
+        self == .claudeCode || self == .openaiCode
     }
 }
 
@@ -153,37 +163,65 @@ enum ButtonStyleChoice: String, Codable, CaseIterable, Hashable {
     case normal, glass
 }
 
-struct AppSettings: Codable, Equatable {
-    // All four providers can be configured and used at the same time — this
-    // is just which one pre-fills the picker in Generate/Ask AI on launch.
-    var defaultProvider: Provider = .openai
-    var openaiModel: String = "gpt-4o-mini"
-    var anthropicModel: String = "claude-sonnet-5"
-    var kimiModel: String = "kimi-k2.5"
-    var geminiModel: String = "gemini-3.5-flash"
-
-    var appearanceMode: AppearanceMode = .system
-    var accentColorHex: String = "#27A6F5"
-    var buttonStyle: ButtonStyleChoice = .normal
+// One task's AI choice — which provider, and which of that provider's
+// models. Each of the three tasks below (other/tailorCv/coverLetter) has
+// its own independent instance, so the same provider can be used for two
+// tasks with two different models — a single shared "this provider's
+// model" setting couldn't represent that.
+struct TaskProviderChoice: Codable, Equatable {
+    var provider: Provider = .openai
+    var model: String = "gpt-4o-mini"
 
     init() {}
 
-    // kimiModel/geminiModel were added after this struct started shipping —
-    // a plain synthesized decoder throws keyNotFound on an existing
-    // settings.json that predates them (verified: Swift's Codable synthesis
-    // does NOT fall back to a property's default value for a missing key,
-    // only for a present-but-null one), which would silently reset every
-    // other setting via the `?? AppSettings()` fallback in AppState.init().
+    init(provider: Provider, model: String) {
+        self.provider = provider
+        self.model = model
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        defaultProvider = try c.decodeIfPresent(Provider.self, forKey: .defaultProvider) ?? .openai
-        openaiModel = try c.decodeIfPresent(String.self, forKey: .openaiModel) ?? "gpt-4o-mini"
-        anthropicModel = try c.decodeIfPresent(String.self, forKey: .anthropicModel) ?? "claude-sonnet-5"
-        kimiModel = try c.decodeIfPresent(String.self, forKey: .kimiModel) ?? "kimi-k2.5"
-        geminiModel = try c.decodeIfPresent(String.self, forKey: .geminiModel) ?? "gemini-3.5-flash"
+        provider = try c.decodeIfPresent(Provider.self, forKey: .provider) ?? .openai
+        model = try c.decodeIfPresent(String.self, forKey: .model) ?? "gpt-4o-mini"
+    }
+}
+
+struct AppSettings: Codable, Equatable {
+    // Each AI action has its own independent provider+model choice, set in
+    // Settings → AI — not a single blanket "default provider" anymore, and
+    // not one model per provider shared across every task that happens to
+    // use it. Mirrors the browser extension's "Model per action" pattern,
+    // one step further (there, a task picks only the provider and follows
+    // that provider's own single model; here each task also picks its own
+    // model).
+    var other: TaskProviderChoice = TaskProviderChoice() // Ask AI + Parse CV
+    var tailorCv: TaskProviderChoice = TaskProviderChoice()
+    var coverLetter: TaskProviderChoice = TaskProviderChoice()
+
+    var appearanceMode: AppearanceMode = .system
+    var accentColorHex: String = "#27A6F5"
+    var menuTextColorHex: String = "#FFFFFF"
+    var buttonStyle: ButtonStyleChoice = .normal
+    var windowStyle: ButtonStyleChoice = .normal
+
+    init() {}
+
+    // Replaces the older single defaultProvider + per-provider model fields
+    // (openaiModel/anthropicModel/...) — decodeIfPresent so an existing
+    // settings.json from before this change loads fine, just starting all
+    // three tasks at the same openai/gpt-4o-mini default rather than
+    // attempting a three-way migration from one old value (see the note on
+    // TaskProviderChoice for why one old value can't map cleanly to three).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        other = try c.decodeIfPresent(TaskProviderChoice.self, forKey: .other) ?? TaskProviderChoice()
+        tailorCv = try c.decodeIfPresent(TaskProviderChoice.self, forKey: .tailorCv) ?? TaskProviderChoice()
+        coverLetter = try c.decodeIfPresent(TaskProviderChoice.self, forKey: .coverLetter) ?? TaskProviderChoice()
         appearanceMode = try c.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? .system
         accentColorHex = try c.decodeIfPresent(String.self, forKey: .accentColorHex) ?? "#27A6F5"
+        menuTextColorHex = try c.decodeIfPresent(String.self, forKey: .menuTextColorHex) ?? "#FFFFFF"
         buttonStyle = try c.decodeIfPresent(ButtonStyleChoice.self, forKey: .buttonStyle) ?? .normal
+        windowStyle = try c.decodeIfPresent(ButtonStyleChoice.self, forKey: .windowStyle) ?? .normal
     }
 }
 

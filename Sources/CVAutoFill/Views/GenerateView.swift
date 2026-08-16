@@ -8,8 +8,6 @@ struct GenerateView: View {
     @State private var busy = false
     @State private var status = ""
     @State private var isError = false
-    @State private var selectedProvider: Provider = .openai
-    @State private var selectedModel: String = ""
 
     var body: some View {
         ScrollView {
@@ -19,25 +17,12 @@ struct GenerateView: View {
                     Text("Upload a CV first, in the CV tab.").foregroundStyle(.secondary)
                 }
 
-                HStack {
-                    Picker("Use", selection: $selectedProvider) {
-                        Text("OpenAI").tag(Provider.openai)
-                        Text("Anthropic").tag(Provider.anthropic)
-                        Text("Kimi").tag(Provider.kimi)
-                        Text("Gemini").tag(Provider.gemini)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 360)
+                Text("Uses the provider and model set for \"Rebuild / tailor CV\" and \"Rebuild / write cover letter\" in Settings → AI.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
 
-                    Picker("Model", selection: $selectedModel) {
-                        ForEach(ModelCatalog.models(for: selectedProvider), id: \.self) { m in
-                            Text(ModelCatalog.displayName(m)).tag(m)
-                        }
-                    }
-                    .frame(maxWidth: 280)
-                }
-                .onChange(of: selectedProvider) { newValue in
-                    selectedModel = state.modelFor(newValue)
+                if state.settings.tailorCv.provider.isCLIBased || state.settings.coverLetter.provider.isCLIBased {
+                    CLITerminalToggle()
                 }
 
                 Text("Paste the job description — title, company, requirements, whatever you have.")
@@ -70,24 +55,21 @@ struct GenerateView: View {
             .padding()
         }
         .navigationTitle("Generate")
-        .onAppear {
-            selectedProvider = state.settings.defaultProvider
-            selectedModel = state.modelFor(selectedProvider)
-        }
     }
 
     private func generateCoverLetter() async {
         guard let cv = state.cvData else { return }
         busy = true
-        status = "Writing a tailored cover letter with \(selectedModel)..."
+        status = "Writing a tailored cover letter with \(state.settings.coverLetter.model)..."
         isError = false
         do {
-            let client = state.aiClient(provider: selectedProvider, model: selectedModel)
+            let client = state.coverLetterAIClient
             coverLetterDraft = try await client.generateCoverLetter(
                 cvData: cv,
                 referenceCoverLetter: state.coverLetterText,
                 jobContext: jobContext,
-                context: state.contextBlock()
+                context: state.contextBlock(),
+                promptOverride: state.promptOverrides.coverLetterWrite
             )
             status = "Draft ready — review before using it."
         } catch {
@@ -100,11 +82,11 @@ struct GenerateView: View {
     private func generateTailoredCV() async {
         guard let cv = state.cvData else { return }
         busy = true
-        status = "Tailoring your CV for this job with \(selectedModel)..."
+        status = "Tailoring your CV for this job with \(state.settings.tailorCv.model)..."
         isError = false
         do {
-            let client = state.aiClient(provider: selectedProvider, model: selectedModel)
-            let tailored = try await client.generateTailoredCV(cvData: cv, jobContext: jobContext, context: state.contextBlock())
+            let client = state.tailorCvAIClient
+            let tailored = try await client.generateTailoredCV(cvData: cv, jobContext: jobContext, context: state.contextBlock(), promptOverride: state.promptOverrides.cvTailor)
             let data = DocxWriter.generate(cv: tailored, style: state.cvStyle)
             saveWithPanel(data: data, suggestedName: "\(safeName(tailored.full_name))_Tailored_CV.docx")
             status = "Tailored CV saved. Review it before sending."

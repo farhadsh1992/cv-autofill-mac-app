@@ -24,11 +24,15 @@ struct AIClient {
     let provider: Provider
     let model: String
     var onUsage: ((Int, Int) -> Void)?
+    // CLI-based providers only — called with text chunks as the CLI streams
+    // its response, for the live terminal panel. No-op for the other providers.
+    var onTerminalLine: ((String) -> Void)?
 
-    init(provider: Provider, model: String, onUsage: ((Int, Int) -> Void)? = nil) {
+    init(provider: Provider, model: String, onUsage: ((Int, Int) -> Void)? = nil, onTerminalLine: ((String) -> Void)? = nil) {
         self.provider = provider
         self.model = model
         self.onUsage = onUsage
+        self.onTerminalLine = onTerminalLine
     }
 
     private var providerName: String { provider.displayName }
@@ -39,10 +43,17 @@ struct AIClient {
         case .anthropic: return Keychain.get(forKey: "anthropicApiKey")
         case .kimi: return Keychain.get(forKey: "kimiApiKey")
         case .gemini: return Keychain.get(forKey: "geminiApiKey")
+        case .claudeCode, .openaiCode: return nil // uses the local CLI's own login instead of a key
         }
     }
 
     private func call(text prompt: String) async throws -> [String: Any] {
+        // CLI-based providers shell out to a local CLI, authenticated via its
+        // own login (subscription, not API key) — no key check needed.
+        if provider.isCLIBased {
+            return try await callCLI(prompt: prompt)
+        }
+
         guard let key = apiKey(), !key.isEmpty else {
             throw AIError.noAPIKey(providerName)
         }
@@ -54,6 +65,28 @@ struct AIClient {
         case .anthropic: return try await callAnthropic(apiKey: key, prompt: prompt)
         case .kimi: return try await callKimi(apiKey: key, prompt: prompt)
         case .gemini: return try await callGemini(apiKey: key, prompt: prompt)
+        case .claudeCode, .openaiCode: return try await callCLI(prompt: prompt)
+        }
+    }
+
+    private func callCLI(prompt: String) async throws -> [String: Any] {
+        do {
+            switch provider {
+            case .claudeCode:
+                let result = try await ClaudeCodeCLI.run(prompt: prompt, model: model, onLine: onTerminalLine)
+                onUsage?(result.inputTokens, result.outputTokens)
+                return try parseJSONLoose(result.text)
+            case .openaiCode:
+                let result = try await CodexCLI.run(prompt: prompt, model: model, onLine: onTerminalLine)
+                onUsage?(result.inputTokens, result.outputTokens)
+                return try parseJSONLoose(result.text)
+            default:
+                throw AIError.apiError("Not a CLI-based provider.")
+            }
+        } catch let error as ClaudeCodeCLI.CLIError {
+            throw AIError.apiError(error.errorDescription ?? "Claude Code error.")
+        } catch let error as CodexCLI.CLIError {
+            throw AIError.apiError(error.errorDescription ?? "Codex CLI error.")
         }
     }
 
@@ -232,15 +265,17 @@ struct AIClient {
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 
-    func parseCV(fromText text: String) async throws -> CVData {
-        let prompt = "\(Prompts.cvSchema)\n\nCV TEXT:\n\(text)"
+    func parseCV(fromText text: String, promptOverride: String? = nil) async throws -> CVData {
+        let instructions = promptOverride ?? Prompts.cvSchema
+        let prompt = "\(instructions)\n\nCV TEXT:\n\(text)"
         let json = try await call(text: prompt)
         return try decodeCV(from: json)
     }
 
-    func generateCoverLetter(cvData: CVData, referenceCoverLetter: String, jobContext: String, context: String) async throws -> String {
+    func generateCoverLetter(cvData: CVData, referenceCoverLetter: String, jobContext: String, context: String, promptOverride: String? = nil) async throws -> String {
+        let instructions = promptOverride ?? Prompts.coverLetterWrite
         let prompt = """
-        \(Prompts.coverLetterWrite)
+        \(instructions)
 
         \(context)
 
@@ -257,9 +292,10 @@ struct AIClient {
         return (json["cover_letter"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func generateTailoredCV(cvData: CVData, jobContext: String, context: String) async throws -> CVData {
+    func generateTailoredCV(cvData: CVData, jobContext: String, context: String, promptOverride: String? = nil) async throws -> CVData {
+        let instructions = promptOverride ?? Prompts.cvTailor
         let prompt = """
-        \(Prompts.cvTailor)
+        \(instructions)
 
         \(context)
 
@@ -273,12 +309,13 @@ struct AIClient {
         return try decodeCV(from: json)
     }
 
-    func ask(question: String, cvData: CVData?, context: String) async throws -> String {
+    func ask(question: String, cvData: CVData?, context: String, promptOverride: String? = nil) async throws -> String {
         guard !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AIError.apiError("Type a question first.")
         }
+        let instructions = promptOverride ?? Prompts.ask
         let prompt = """
-        \(Prompts.ask)
+        \(instructions)
 
         \(context)
 

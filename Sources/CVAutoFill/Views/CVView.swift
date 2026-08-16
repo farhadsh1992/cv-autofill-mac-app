@@ -37,6 +37,10 @@ struct CVView: View {
                     Button("Parse pasted text") { Task { await parseText(pasteText) } }
                 }
 
+                if state.settings.other.provider.isCLIBased {
+                    CLITerminalToggle()
+                }
+
                 Text("Parsed CV data (JSON) — edit if the AI got something wrong, then Save.")
                     .foregroundStyle(.secondary)
                     .padding(.top, 6)
@@ -125,7 +129,7 @@ struct CVView: View {
         status = "Parsing CV with AI..."
         isError = false
         do {
-            let cv = try await state.defaultAIClient.parseCV(fromText: text)
+            let cv = try await state.defaultAIClient.parseCV(fromText: text, promptOverride: state.promptOverrides.cvSchema)
             state.cvData = cv
             state.saveCV()
             syncFromState()

@@ -16,6 +16,12 @@ final class AppState: ObservableObject {
     @Published var usage: UsageLog
     @Published var cvStyle: DocxStyle
     @Published var lastAutoImportMessage: String?
+    @Published var promptOverrides: PromptOverrides
+    // Shared by both CLI-based providers (only one runs at a time) — the
+    // panel's title just reflects whichever one is currently active.
+    @Published var cliTerminalText: String = ""
+    @Published var cliTerminalVisible = false
+    @Published var cliTerminalProviderName: String = ""
 
     init() {
         settings = Storage.loadJSON(AppSettings.self, from: "settings.json") ?? AppSettings()
@@ -30,6 +36,7 @@ final class AppState: ObservableObject {
         geminiApiKey = Keychain.get(forKey: "geminiApiKey") ?? ""
         usage = Storage.loadJSON(UsageLog.self, from: "usage.json") ?? UsageLog()
         cvStyle = AppState.loadCVStyle()
+        promptOverrides = Storage.loadJSON(PromptOverrides.self, from: "prompts.json") ?? PromptOverrides()
         migrateLegacyAboutMeText()
         autoImportJobsFromDownloads()
     }
@@ -120,36 +127,56 @@ final class AppState: ObservableObject {
     func saveAboutMeNotes() { Storage.saveJSON(aboutMeNotes, to: "about-me-notes.json") }
     func saveResources() { Storage.saveJSON(resources, to: "resources.json") }
     func saveJobs() { Storage.saveJSON(jobs, to: "jobs.json") }
+    func savePromptOverrides() { Storage.saveJSON(promptOverrides, to: "prompts.json") }
 
     func contextBlock() -> String {
         ContextBuilder.build(aboutMeNotes: aboutMeNotes, resources: resources)
-    }
-
-    func modelFor(_ provider: Provider) -> String {
-        switch provider {
-        case .openai: return settings.openaiModel
-        case .anthropic: return settings.anthropicModel
-        case .kimi: return settings.kimiModel
-        case .gemini: return settings.geminiModel
-        }
     }
 
     /// Builds a client for a specific provider/model, wired to record token
     /// usage automatically. Both providers can be configured and used side
     /// by side — this is how callers pick which one for a given request.
     func aiClient(provider: Provider, model: String) -> AIClient {
-        AIClient(provider: provider, model: model) { [weak self] input, output in
-            Task { @MainActor in
-                self?.recordUsage(provider: provider, model: model, input: input, output: output)
+        if provider.isCLIBased {
+            cliTerminalText = ""
+            cliTerminalProviderName = provider.displayName
+        }
+        return AIClient(
+            provider: provider, model: model,
+            onUsage: { [weak self] input, output in
+                Task { @MainActor in
+                    self?.recordUsage(provider: provider, model: model, input: input, output: output)
+                }
+            },
+            onTerminalLine: { [weak self] chunk in
+                self?.appendCLITerminalText(chunk)
             }
+        )
+    }
+
+    // ClaudeCodeCLI/CodexCLI already dispatch onLine to the main thread, so
+    // this can run directly rather than hopping through another Task.
+    func appendCLITerminalText(_ chunk: String) {
+        cliTerminalText += chunk
+        let maxLength = 50_000
+        if cliTerminalText.count > maxLength {
+            cliTerminalText = String(cliTerminalText.suffix(maxLength))
         }
     }
 
     /// Convenience for call sites that don't offer a per-action picker
-    /// (CV parsing, cover letter PDF text extraction) — uses whichever
-    /// provider is set as the default in Settings.
+    /// (CV parsing, cover letter PDF text extraction, Ask AI) — uses the
+    /// "Other" task's provider+model from Settings → AI.
     var defaultAIClient: AIClient {
-        aiClient(provider: settings.defaultProvider, model: modelFor(settings.defaultProvider))
+        aiClient(provider: settings.other.provider, model: settings.other.model)
+    }
+
+    var tailorCvAIClient: AIClient {
+        aiClient(provider: settings.tailorCv.provider, model: settings.tailorCv.model)
+    }
+
+    var coverLetterAIClient: AIClient {
+        aiClient(provider: settings.coverLetter.provider, model: settings.coverLetter.model)
     }
 
     func recordUsage(provider: Provider, model: String, input: Int, output: Int) {

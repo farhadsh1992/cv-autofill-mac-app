@@ -1,6 +1,22 @@
 import SwiftUI
 
+// Chrome/Firefox always pass an extra command-line argument (the calling
+// extension's origin) when launching a native messaging host — a normal
+// Finder/Dock double-click launch never does. That's the signal used here
+// to skip the whole SwiftUI/AppKit app lifecycle entirely for a native
+// messaging invocation (see NativeMessagingHost.swift) rather than
+// briefly flashing a window before the browser tears the process down.
 @main
+enum CVAutoFillMain {
+    static func main() {
+        if CommandLine.arguments.count > 1 {
+            NativeMessagingHost.run()
+            exit(0)
+        }
+        CVAutoFillApp.main()
+    }
+}
+
 struct CVAutoFillApp: App {
     @StateObject private var state = AppState()
 

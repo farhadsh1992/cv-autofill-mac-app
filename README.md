@@ -58,20 +58,59 @@ why, and how to move data between them manually if you want to).
   writes `applied jobs.docx` (the same landscape table format) and
   `applied jobs.json` straight to your Downloads folder — no dialog,
   overwriting the previous export each time.
+- **Prompts** — the exact instructions sent to the AI for each task (Parse
+  CV, Generate cover letter, Tailor CV, Ask AI), editable and saved per task.
+  Leave a box empty (or unchanged) and save to fall back to the built-in
+  default — nothing is lost, since the default text is always shown until
+  you actually type something different. Included in Settings → Backup
+  export/import, same as everything else.
 - **Settings** — API keys, models, appearance, and a running usage/cost
   summary.
 
-## Four providers, at once
+## Six providers, three independent tasks
 
-OpenAI, Anthropic, Kimi (Moonshot), and Gemini (Google) can all be
-configured simultaneously in Settings → AI — all four API keys, all four
-model choices, live side by side. **Generate** has its own provider/model
-picker so you choose which one to use per request; **Ask AI** and CV
-parsing use whichever one is set as the "Default provider" in Settings.
-(Unlike the browser extension, this app never sends a PDF to the AI at all
-— CVs and cover letters are extracted locally via PDFKit first — so Kimi's
-lack of PDF support, a real limitation on the extension side, doesn't apply
-here.)
+OpenAI, Anthropic, Kimi (Moonshot), Gemini (Google), Claude Code (Terminal),
+and OpenAI Codex (Terminal) can all be configured simultaneously in
+Settings → AI. Each of the six provider sections there is credentials
+only — an API key, or CLI setup/login status for the two terminal
+providers — nothing else.
+
+Which provider (and which of that provider's models) actually gets used is
+set separately, per task, at the top of Settings → AI:
+
+- **Rebuild / tailor CV** — used by Generate's "Generate tailored CV" button.
+- **Rebuild / write cover letter** — used by Generate's "Generate cover
+  letter" button.
+- **Other** — Ask AI and CV parsing.
+
+Each of the three has its own provider *and* model picker, independent of
+the other two — you can, for example, tailor your CV with
+`claude-opus-5` while writing cover letters with `gpt-4o-mini`, or run both
+through the same provider but different models. (Unlike the browser
+extension, this app never sends a PDF to the AI at all — CVs and cover
+letters are extracted locally via PDFKit first — so Kimi's lack of PDF
+support, a real limitation on the extension side, doesn't apply here.)
+
+**Claude Code (Terminal)** and **OpenAI Codex (Terminal)** are different
+from the other four — instead of an HTTP API call billed per token, they
+shell out to the `claude`/`codex` CLI already logged into this Mac's
+Terminal (`claude login` / `codex login`), so they run on your Claude
+Pro/Max or ChatGPT Plus/Pro/Team subscription instead of an API key. Both
+are Mac-app-only: the browser extension has no way to run a terminal
+process itself (it reaches these two by launching this app in a headless
+mode instead — see "Extension vs. app" below). Every call runs with
+file/bash/web tool access switched off (`claude -p --tools ""` /
+`codex exec -s read-only --ask-for-approval never`) from a fresh, empty
+working directory each time — it's a plain text-in, text-out completion,
+same shape as the other four providers, not an agent with access to your
+filesystem. Since a GUI app doesn't inherit your Terminal's `PATH`, the app
+looks for `claude`/`codex` at a few common install locations, then falls
+back to asking your login shell (whatever `$SHELL` is) to resolve them the
+way Terminal would — their sections in Settings → AI show whether each was
+found, with a "Set up..." button (terminal + guide side by side) when not.
+Because billing is flat-rate, not per-token, their usage summaries always
+show $0 estimated cost — the token counts are still real, the dollar figure
+just isn't meaningful the way it is for the other four providers.
 
 Settings also shows a running **usage summary** per provider/model — total
 tokens (exact, from each API response) and an estimated dollar cost. The
@@ -92,6 +131,19 @@ button style choice: **Normal** (standard macOS bordered buttons) or
 against the actual installed macOS 26 SDK rather than guessed; falls back
 to Normal automatically on older macOS.
 
+The same button color also fills the selected sidebar item's background
+(macOS's native list-selection highlight ignores both `.tint()` and
+`.listItemTint()` here — `.listRowBackground` is what actually replaces it).
+A separate **selected menu text color** picker controls that row's text
+color independently, for when the button color makes the default white text
+hard to read.
+
+A **window style** choice (Normal/Glass, same macOS 26 requirement as button
+style) adds a Liquid Glass background behind the sidebar and the main
+content panel individually. There's no whole-window glass option — wrapping
+the entire `NavigationSplitView` in one glass shape broke this app's layout
+when tried, so glass is scoped to each panel's own background instead.
+
 ## Extension vs. app
 
 The browser extension can read the current browser tab — scrape a job
@@ -105,6 +157,18 @@ app has none of that, so:
 - Storage is separate — a browser extension and a native app can't share
   storage directly. Settings → Backup (Export/Import) is how you move data
   between them (see below).
+- One exception where they *do* talk to each other: the extension's Claude
+  Code / OpenAI Codex "Terminal" providers work by launching this app's own
+  executable as a Chrome/Firefox [Native Messaging](https://developer.chrome.com/docs/apps/nativeMessaging)
+  host — see `NativeMessagingHost.swift` and the `@main` dispatch in
+  `CVAutoFillApp.swift`. A browser extension can't run a process itself, so
+  the browser launches this binary in a headless mode it detects from the
+  extra command-line argument every native-messaging launch carries (a
+  normal double-click never has one); it reuses the exact same
+  `ClaudeCodeCLI`/`CodexCLI` code the GUI's own providers use, reads one
+  JSON request from stdin, writes one response, and exits — a fresh,
+  separate launch per request, not a connection to an already-open GUI
+  window. Set up from the extension's side: `cv_autofill_extension/native-host/install.sh`.
 
 ## Where your data lives
 
@@ -164,14 +228,25 @@ app icon — clone `cv-autofill-extension` next to this folder to get it.
 Package.swift                    SPM manifest (macOS 13+, no dependencies)
 build_app.sh                     Builds + bundles into dist/Farhad's CV AutoFill.app
 Sources/CVAutoFill/
-  CVAutoFillApp.swift             @main entry point, window sizing, appearance modifiers
+  CVAutoFillApp.swift             @main CVAutoFillMain dispatches to either NativeMessagingHost.run()
+                                   (headless) or the real CVAutoFillApp SwiftUI App (window sizing, appearance)
+  NativeMessagingHost.swift       Chrome/Firefox native-messaging stdio loop for the extension's Terminal
+                                   providers — reuses ClaudeCodeCLI/CodexCLI, one request/response then exit
   AppState.swift                  ObservableObject — loads/saves everything, builds AI clients
   Models.swift                    CVData/ResourceItem/AboutMeNote/JobItem/AppSettings (same shape as the extension's)
   Usage.swift                     Token/cost tracking, model catalog, price table
   Storage.swift                   Application Support JSON/text files + Keychain
   Prompts.swift                   Ported verbatim from the extension's background.js
+  PromptOverrides.swift           Per-task prompt override model — nil means "use Prompts.swift's default"
   AIClient.swift                  OpenAI/Anthropic/Kimi/Gemini APIs, per-request provider+model — text
                                    prompts only, no PDF (CVs are extracted locally via DocumentIO.swift)
+  ClaudeCodeCLI.swift              Shells out to the local `claude` CLI (Pro/Max login, --tools "" only) —
+                                   what powers the Claude Code (Terminal) provider
+  CodexCLI.swift                   Shells out to the local `codex` CLI (ChatGPT login, -s read-only) —
+                                   what powers the OpenAI Codex (Terminal) provider
+  ShellCommandRunner.swift         Runs an arbitrary command the user typed in the setup guide's terminal pane,
+                                   streaming combined stdout+stderr live — distinct from ClaudeCodeCLI/CodexCLI,
+                                   which run one fixed, tool-restricted completion call
   DocxWriter.swift                Ported from the extension's lib/docx-writer.js — CV template with photo/color
                                    embedding, plus generateJobs() for the applied-jobs table export
   DocxStyleExtractor.swift        Hand-rolled ZIP reader — pulls a photo + accent color out of an uploaded .docx

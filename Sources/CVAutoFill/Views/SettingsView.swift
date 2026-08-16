@@ -15,6 +15,8 @@ struct SettingsView: View {
     @State private var isError = false
     @State private var backupStatus = ""
     @State private var backupIsError = false
+    @State private var showClaudeCodeSetup = false
+    @State private var showCodexSetup = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,6 +39,12 @@ struct SettingsView: View {
             .formStyle(.grouped)
         }
         .navigationTitle("Settings")
+        .sheet(isPresented: $showClaudeCodeSetup) {
+            CLISetupGuideView(kind: .claudeCode)
+        }
+        .sheet(isPresented: $showCodexSetup) {
+            CLISetupGuideView(kind: .openaiCode)
+        }
     }
 
     @ViewBuilder
@@ -57,6 +65,21 @@ struct SettingsView: View {
                 ),
                 supportsOpacity: false
             )
+            Text("Also used for the selected item's background in the sidebar.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            ColorPicker(
+                "Selected menu text color",
+                selection: Binding(
+                    get: { Color(hex: state.settings.menuTextColorHex) },
+                    set: { state.settings.menuTextColorHex = $0.toHex() }
+                ),
+                supportsOpacity: false
+            )
+            Text("The sidebar item's text color while it's selected — set this separately if your button color makes the default white text hard to read.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             Picker("Button style", selection: $state.settings.buttonStyle) {
                 Text("Normal").tag(ButtonStyleChoice.normal)
@@ -64,6 +87,15 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             Text(glassNote)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Picker("Window style", selection: $state.settings.windowStyle) {
+                Text("Normal").tag(ButtonStyleChoice.normal)
+                Text("Glass").tag(ButtonStyleChoice.glass)
+            }
+            .pickerStyle(.segmented)
+            Text(windowGlassNote)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         } header: {
@@ -74,18 +106,14 @@ struct SettingsView: View {
     @ViewBuilder
     private var aiSection: some View {
         Section {
-            Text("None of these offer a public account-login flow for third-party apps — their consumer chat subscriptions are separate from their developer APIs. An API key, billed per call, is the supported way to connect. All four can be set up at once — pick which one to use per generation.")
+            Text("Each action below picks its own provider and model, independently — the same provider can be used with different models for different tasks. The sections further down are credentials only: an API key, or CLI setup, for each provider you want available here.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Picker("Default provider", selection: $state.settings.defaultProvider) {
-                Text("OpenAI").tag(Provider.openai)
-                Text("Anthropic").tag(Provider.anthropic)
-                Text("Kimi").tag(Provider.kimi)
-                Text("Gemini").tag(Provider.gemini)
-            }
-            .pickerStyle(.segmented)
-            Text("Pre-fills the picker in Generate — you can still switch providers per action there.")
+            taskPicker(title: "Rebuild / tailor CV", choice: $state.settings.tailorCv)
+            taskPicker(title: "Rebuild / write cover letter", choice: $state.settings.coverLetter)
+            taskPicker(title: "Other", choice: $state.settings.other)
+            Text("\"Other\" covers Ask AI and CV parsing.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         } header: {
@@ -94,11 +122,6 @@ struct SettingsView: View {
 
         Section {
             SecureField("sk-...", text: $state.openaiApiKey)
-            Picker("Model", selection: $state.settings.openaiModel) {
-                ForEach(ModelCatalog.openai, id: \.self) { m in
-                    Text(ModelCatalog.displayName(m)).tag(m)
-                }
-            }
             Link("Get an API key at platform.openai.com/api-keys", destination: URL(string: "https://platform.openai.com/api-keys")!)
                 .font(.footnote)
             UsageSummary(provider: .openai)
@@ -108,11 +131,6 @@ struct SettingsView: View {
 
         Section {
             SecureField("sk-ant-...", text: $state.anthropicApiKey)
-            Picker("Model", selection: $state.settings.anthropicModel) {
-                ForEach(ModelCatalog.anthropic, id: \.self) { m in
-                    Text(ModelCatalog.displayName(m)).tag(m)
-                }
-            }
             Link("Get an API key at console.anthropic.com/settings/keys", destination: URL(string: "https://console.anthropic.com/settings/keys")!)
                 .font(.footnote)
             UsageSummary(provider: .anthropic)
@@ -122,11 +140,6 @@ struct SettingsView: View {
 
         Section {
             SecureField("sk-...", text: $state.kimiApiKey)
-            Picker("Model", selection: $state.settings.kimiModel) {
-                ForEach(ModelCatalog.kimi, id: \.self) { m in
-                    Text(ModelCatalog.displayName(m)).tag(m)
-                }
-            }
             Link("Get an API key at platform.moonshot.ai/console/api-keys", destination: URL(string: "https://platform.moonshot.ai/console/api-keys")!)
                 .font(.footnote)
             Text("If your account is on Moonshot's mainland-China platform instead, its keys are issued for api.moonshot.cn and won't work here.")
@@ -139,16 +152,53 @@ struct SettingsView: View {
 
         Section {
             SecureField("AIza...", text: $state.geminiApiKey)
-            Picker("Model", selection: $state.settings.geminiModel) {
-                ForEach(ModelCatalog.gemini, id: \.self) { m in
-                    Text(ModelCatalog.displayName(m)).tag(m)
-                }
-            }
             Link("Get an API key at aistudio.google.com/apikey", destination: URL(string: "https://aistudio.google.com/apikey")!)
                 .font(.footnote)
             UsageSummary(provider: .gemini)
         } header: {
             Text("Gemini (Google)").font(.headline)
+        }
+
+        Section {
+            if let path = ClaudeCodeCLI.resolvePath() {
+                Text("Found: \(path)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack {
+                    Text("The claude command wasn't found.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                    Button("Set up...") { showClaudeCodeSetup = true }
+                }
+            }
+            Text("Runs through the claude CLI already logged into your Mac's Terminal — your Pro/Max subscription, not an API key or per-token billing. File/bash/web tool access is switched off for these calls, same as every other provider here — it's a plain text-in, text-out completion.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            UsageSummary(provider: .claudeCode)
+        } header: {
+            Text("Claude Code (Terminal)").font(.headline)
+        }
+
+        Section {
+            if let path = CodexCLI.resolvePath() {
+                Text("Found: \(path)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack {
+                    Text("The codex command wasn't found.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                    Button("Set up...") { showCodexSetup = true }
+                }
+            }
+            Text("Runs through OpenAI's codex CLI, logged in with your ChatGPT Plus/Pro/Team account — not an API key or per-token billing. Sandbox mode is set to read-only with approvals disabled, same intent as Claude Code above: a plain text-in, text-out completion, no file/bash/web access.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            UsageSummary(provider: .openaiCode)
+        } header: {
+            Text("OpenAI Codex (Terminal)").font(.headline)
         }
 
         Section {
@@ -173,6 +223,34 @@ struct SettingsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    @ViewBuilder
+    private func taskPicker(title: String, choice: Binding<TaskProviderChoice>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.subheadline.weight(.medium))
+            HStack {
+                Picker("Provider", selection: choice.provider) {
+                    ForEach(Provider.allCases, id: \.self) { p in
+                        Text(p.displayName).tag(p)
+                    }
+                }
+                .labelsHidden()
+                .frame(minWidth: 160)
+                .onChange(of: choice.wrappedValue.provider) { newProvider in
+                    choice.wrappedValue.model = ModelCatalog.models(for: newProvider).first ?? ""
+                }
+
+                Picker("Model", selection: choice.model) {
+                    ForEach(ModelCatalog.models(for: choice.wrappedValue.provider), id: \.self) { m in
+                        Text(ModelCatalog.displayName(m)).tag(m)
+                    }
+                }
+                .labelsHidden()
+                .frame(minWidth: 220)
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     @ViewBuilder
@@ -244,6 +322,14 @@ struct SettingsView: View {
     private var glassNote: String {
         if #available(macOS 26.0, *) {
             return "Glass uses macOS's Liquid Glass button material. (The window's title bar already gets that look automatically from macOS 26 itself — that part isn't controlled by this app.)"
+        } else {
+            return "Glass needs macOS 26 (Tahoe) or later — this Mac will use the normal style regardless."
+        }
+    }
+
+    private var windowGlassNote: String {
+        if #available(macOS 26.0, *) {
+            return "Glass adds a Liquid Glass background behind the sidebar and the main content panel. Whole-window glass isn't offered — it broke this app's layout when tried."
         } else {
             return "Glass needs macOS 26 (Tahoe) or later — this Mac will use the normal style regardless."
         }
