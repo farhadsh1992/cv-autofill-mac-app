@@ -11,20 +11,23 @@ struct UsageLog: Codable, Equatable {
     var anthropic: [String: UsageStats] = [:]
     var kimi: [String: UsageStats] = [:]
     var gemini: [String: UsageStats] = [:]
+    var deepseek: [String: UsageStats] = [:]
     var claudeCode: [String: UsageStats] = [:]
     var openaiCode: [String: UsageStats] = [:]
 
     init() {}
 
-    // kimi/gemini/claudeCode/openaiCode were added after this struct started
-    // shipping — see the matching note on AppSettings.init(from:) for why a
-    // plain synthesized decoder would break loading an existing usage.json.
+    // kimi/gemini/deepseek/claudeCode/openaiCode were added after this struct
+    // started shipping — see the matching note on AppSettings.init(from:) for
+    // why a plain synthesized decoder would break loading an existing
+    // usage.json.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         openai = try c.decodeIfPresent([String: UsageStats].self, forKey: .openai) ?? [:]
         anthropic = try c.decodeIfPresent([String: UsageStats].self, forKey: .anthropic) ?? [:]
         kimi = try c.decodeIfPresent([String: UsageStats].self, forKey: .kimi) ?? [:]
         gemini = try c.decodeIfPresent([String: UsageStats].self, forKey: .gemini) ?? [:]
+        deepseek = try c.decodeIfPresent([String: UsageStats].self, forKey: .deepseek) ?? [:]
         claudeCode = try c.decodeIfPresent([String: UsageStats].self, forKey: .claudeCode) ?? [:]
         openaiCode = try c.decodeIfPresent([String: UsageStats].self, forKey: .openaiCode) ?? [:]
     }
@@ -35,6 +38,7 @@ struct UsageLog: Codable, Equatable {
         case .anthropic: return anthropic
         case .kimi: return kimi
         case .gemini: return gemini
+        case .deepseek: return deepseek
         case .claudeCode: return claudeCode
         case .openaiCode: return openaiCode
         }
@@ -46,6 +50,7 @@ struct UsageLog: Codable, Equatable {
         case .anthropic: anthropic = dict
         case .kimi: kimi = dict
         case .gemini: gemini = dict
+        case .deepseek: deepseek = dict
         case .claudeCode: claudeCode = dict
         case .openaiCode: openaiCode = dict
         }
@@ -64,6 +69,7 @@ enum ModelCatalog {
     static let anthropic = ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"]
     static let kimi = ["kimi-k2.5", "kimi-k3"]
     static let gemini = ["gemini-3.5-flash", "gemini-3.1-pro"]
+    static let deepseek = ["deepseek-v4-flash", "deepseek-v4-pro"]
     // Aliases the claude CLI's --model flag accepts; "default" omits the
     // flag entirely and lets the CLI pick its own default model.
     static let claudeCode = ["default", "sonnet", "opus", "haiku", "fable"]
@@ -79,6 +85,7 @@ enum ModelCatalog {
         case .anthropic: return anthropic
         case .kimi: return kimi
         case .gemini: return gemini
+        case .deepseek: return deepseek
         case .claudeCode: return claudeCode
         case .openaiCode: return openaiCode
         }
@@ -94,6 +101,8 @@ enum ModelCatalog {
         case "kimi-k3": return "kimi-k3 (most capable)"
         case "gemini-3.5-flash": return "gemini-3.5-flash (fastest/cheapest)"
         case "gemini-3.1-pro": return "gemini-3.1-pro (most capable)"
+        case "deepseek-v4-flash": return "deepseek-v4-flash (fastest/cheapest)"
+        case "deepseek-v4-pro": return "deepseek-v4-pro-0813 (most capable)"
         case "default": return "Default (whatever the CLI picks)"
         case "sonnet": return "Sonnet"
         case "opus": return "Opus"
@@ -131,6 +140,15 @@ enum Pricing {
         "gemini-3.1-pro": (2.00, 12.00),
     ]
 
+    // DeepSeek bills peak/off-peak (roughly double during 01:00-04:00 and
+    // 06:00-10:00 UTC) — these are the cheaper off-peak rates, so this
+    // estimate runs low during peak hours rather than high the rest of the
+    // day. Open-weight model, but this hosted API is still paid per token.
+    static let deepseek: [String: (input: Double, output: Double)] = [
+        "deepseek-v4-flash": (0.22, 0.66),
+        "deepseek-v4-pro": (0.66, 1.98),
+    ]
+
     static func estimateCost(provider: Provider, model: String, inputTokens: Int, outputTokens: Int) -> Double {
         // Both CLI-based providers run on a flat-rate subscription, not
         // per-token API billing — there's no meaningful dollar figure here.
@@ -141,6 +159,7 @@ enum Pricing {
         case .anthropic: table = anthropic
         case .kimi: table = kimi
         case .gemini: table = gemini
+        case .deepseek: table = deepseek
         case .claudeCode, .openaiCode: table = [:]
         }
         guard let rates = table[model] else { return 0 }

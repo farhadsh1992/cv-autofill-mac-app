@@ -41,6 +41,7 @@ enum Backup {
             "anthropic": ["apiKey": state.anthropicApiKey, "model": modelForExport(.anthropic, state: state)],
             "kimi": ["apiKey": state.kimiApiKey, "model": modelForExport(.kimi, state: state)],
             "gemini": ["apiKey": state.geminiApiKey, "model": modelForExport(.gemini, state: state)],
+            "deepseek": ["apiKey": state.deepseekApiKey, "model": modelForExport(.deepseek, state: state)],
             // No apiKey — CLI-based providers authenticate via their own
             // local login, not a key.
             "claudeCode": ["model": modelForExport(.claudeCode, state: state)],
@@ -154,6 +155,11 @@ enum Backup {
                 if let key = gemini["apiKey"] as? String, !key.isEmpty { state.geminiApiKey = key }
                 if let model = gemini["model"] as? String, !model.isEmpty { providerModelGuess[.gemini] = model }
                 result.imported.append("Gemini key")
+            }
+            if let deepseek = providers["deepseek"] as? [String: Any] {
+                if let key = deepseek["apiKey"] as? String, !key.isEmpty { state.deepseekApiKey = key }
+                if let model = deepseek["model"] as? String, !model.isEmpty { providerModelGuess[.deepseek] = model }
+                result.imported.append("DeepSeek key")
             }
             if let claudeCode = providers["claudeCode"] as? [String: Any],
                let model = claudeCode["model"] as? String, !model.isEmpty {

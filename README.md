@@ -67,11 +67,11 @@ why, and how to move data between them manually if you want to).
 - **Settings** — API keys, models, appearance, and a running usage/cost
   summary.
 
-## Six providers, three independent tasks
+## Seven providers, three independent tasks
 
-OpenAI, Anthropic, Kimi (Moonshot), Gemini (Google), Claude Code (Terminal),
-and OpenAI Codex (Terminal) can all be configured simultaneously in
-Settings → AI. Each of the six provider sections there is credentials
+OpenAI, Anthropic, Kimi (Moonshot), Gemini (Google), DeepSeek, Claude Code
+(Terminal), and OpenAI Codex (Terminal) can all be configured simultaneously
+in Settings → AI. Each of the seven provider sections there is credentials
 only — an API key, or CLI setup/login status for the two terminal
 providers — nothing else.
 
@@ -88,11 +88,17 @@ the other two — you can, for example, tailor your CV with
 `claude-opus-5` while writing cover letters with `gpt-4o-mini`, or run both
 through the same provider but different models. (Unlike the browser
 extension, this app never sends a PDF to the AI at all — CVs and cover
-letters are extracted locally via PDFKit first — so Kimi's lack of PDF
-support, a real limitation on the extension side, doesn't apply here.)
+letters are extracted locally via PDFKit first — so Kimi's and DeepSeek's
+lack of PDF support, a real limitation on the extension side, doesn't apply
+here.)
+
+**DeepSeek** is an open-weight model, but the API this app calls is not
+free — it's billed per token, same as the other three HTTP providers above,
+just at a lower rate. Only DeepSeek's own consumer chat app
+(chat.deepseek.com) is free; that's a separate product this app doesn't use.
 
 **Claude Code (Terminal)** and **OpenAI Codex (Terminal)** are different
-from the other four — instead of an HTTP API call billed per token, they
+from the other five — instead of an HTTP API call billed per token, they
 shell out to the `claude`/`codex` CLI already logged into this Mac's
 Terminal (`claude login` / `codex login`), so they run on your Claude
 Pro/Max or ChatGPT Plus/Pro/Team subscription instead of an API key. Both
@@ -102,7 +108,7 @@ mode instead — see "Extension vs. app" below). Every call runs with
 file/bash/web tool access switched off (`claude -p --tools ""` /
 `codex exec -s read-only --ask-for-approval never`) from a fresh, empty
 working directory each time — it's a plain text-in, text-out completion,
-same shape as the other four providers, not an agent with access to your
+same shape as the other five providers, not an agent with access to your
 filesystem. Since a GUI app doesn't inherit your Terminal's `PATH`, the app
 looks for `claude`/`codex` at a few common install locations, then falls
 back to asking your login shell (whatever `$SHELL` is) to resolve them the
@@ -110,7 +116,7 @@ way Terminal would — their sections in Settings → AI show whether each was
 found, with a "Set up..." button (terminal + guide side by side) when not.
 Because billing is flat-rate, not per-token, their usage summaries always
 show $0 estimated cost — the token counts are still real, the dollar figure
-just isn't meaningful the way it is for the other four providers.
+just isn't meaningful the way it is for the other five providers.
 
 Settings also shows a running **usage summary** per provider/model — total
 tokens (exact, from each API response) and an estimated dollar cost. The

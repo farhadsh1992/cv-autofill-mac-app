@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
     @Published var anthropicApiKey: String
     @Published var kimiApiKey: String
     @Published var geminiApiKey: String
+    @Published var deepseekApiKey: String
     @Published var usage: UsageLog
     @Published var cvStyle: DocxStyle
     @Published var lastAutoImportMessage: String?
@@ -34,6 +35,7 @@ final class AppState: ObservableObject {
         anthropicApiKey = Keychain.get(forKey: "anthropicApiKey") ?? ""
         kimiApiKey = Keychain.get(forKey: "kimiApiKey") ?? ""
         geminiApiKey = Keychain.get(forKey: "geminiApiKey") ?? ""
+        deepseekApiKey = Keychain.get(forKey: "deepseekApiKey") ?? ""
         usage = Storage.loadJSON(UsageLog.self, from: "usage.json") ?? UsageLog()
         cvStyle = AppState.loadCVStyle()
         promptOverrides = Storage.loadJSON(PromptOverrides.self, from: "prompts.json") ?? PromptOverrides()
@@ -79,6 +81,7 @@ final class AppState: ObservableObject {
         Keychain.set(anthropicApiKey, forKey: "anthropicApiKey")
         Keychain.set(kimiApiKey, forKey: "kimiApiKey")
         Keychain.set(geminiApiKey, forKey: "geminiApiKey")
+        Keychain.set(deepseekApiKey, forKey: "deepseekApiKey")
     }
 
     func saveCV() {

@@ -134,6 +134,7 @@ enum Provider: String, Codable, CaseIterable, Hashable {
     case anthropic
     case kimi
     case gemini
+    case deepseek
     case claudeCode
     case openaiCode
 
@@ -143,6 +144,7 @@ enum Provider: String, Codable, CaseIterable, Hashable {
         case .anthropic: return "Anthropic"
         case .kimi: return "Kimi"
         case .gemini: return "Gemini"
+        case .deepseek: return "DeepSeek"
         case .claudeCode: return "Claude Code (Terminal)"
         case .openaiCode: return "OpenAI Codex (Terminal)"
         }

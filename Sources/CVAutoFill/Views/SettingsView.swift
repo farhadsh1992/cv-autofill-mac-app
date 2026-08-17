@@ -160,6 +160,18 @@ struct SettingsView: View {
         }
 
         Section {
+            SecureField("sk-...", text: $state.deepseekApiKey)
+            Link("Get an API key at platform.deepseek.com/api_keys", destination: URL(string: "https://platform.deepseek.com/api_keys")!)
+                .font(.footnote)
+            Text("Open-weight model, but this API is still billed per token like the others here — only DeepSeek's own consumer chat app (chat.deepseek.com) is free. Doesn't support PDF uploads — switch to OpenAI, Anthropic, or Gemini first for those.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            UsageSummary(provider: .deepseek)
+        } header: {
+            Text("DeepSeek").font(.headline)
+        }
+
+        Section {
             if let path = ClaudeCodeCLI.resolvePath() {
                 Text("Found: \(path)")
                     .font(.footnote)
@@ -207,6 +219,7 @@ struct SettingsView: View {
                     let checks: [(String, String)] = [
                         (state.openaiApiKey, "OpenAI"), (state.anthropicApiKey, "Anthropic"),
                         (state.kimiApiKey, "Kimi"), (state.geminiApiKey, "Gemini"),
+                        (state.deepseekApiKey, "DeepSeek"),
                     ]
                     for (key, name) in checks where key.contains("://") {
                         status = "The \(name) API key field has a URL in it, not a key — paste the actual key instead."

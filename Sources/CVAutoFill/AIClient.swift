@@ -43,6 +43,7 @@ struct AIClient {
         case .anthropic: return Keychain.get(forKey: "anthropicApiKey")
         case .kimi: return Keychain.get(forKey: "kimiApiKey")
         case .gemini: return Keychain.get(forKey: "geminiApiKey")
+        case .deepseek: return Keychain.get(forKey: "deepseekApiKey")
         case .claudeCode, .openaiCode: return nil // uses the local CLI's own login instead of a key
         }
     }
@@ -65,6 +66,7 @@ struct AIClient {
         case .anthropic: return try await callAnthropic(apiKey: key, prompt: prompt)
         case .kimi: return try await callKimi(apiKey: key, prompt: prompt)
         case .gemini: return try await callGemini(apiKey: key, prompt: prompt)
+        case .deepseek: return try await callDeepSeek(apiKey: key, prompt: prompt)
         case .claudeCode, .openaiCode: return try await callCLI(prompt: prompt)
         }
     }
@@ -188,6 +190,41 @@ struct AIClient {
         guard (200..<300).contains(http.statusCode) else {
             let text = String(data: data, encoding: .utf8) ?? ""
             throw AIError.apiError("Kimi API error \(http.statusCode): \(text.prefix(300))")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AIError.badResponse
+        }
+        if let usage = json["usage"] as? [String: Any] {
+            let input = (usage["prompt_tokens"] as? Int) ?? 0
+            let output = (usage["completion_tokens"] as? Int) ?? 0
+            onUsage?(input, output)
+        }
+        let text = ((json["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any])?["content"] as? String ?? ""
+        return try parseJSONLoose(text)
+    }
+
+    // DeepSeek's API is OpenAI-compatible chat completions, same shape as
+    // Kimi's above. The weights are open-source, but this hosted API is
+    // still billed per token like every other provider here — only
+    // DeepSeek's own consumer chat app (chat.deepseek.com) is free; that's
+    // a separate product from this API.
+    private func callDeepSeek(apiKey: String, prompt: String) async throws -> [String: Any] {
+        var request = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let body: [String: Any] = [
+            "model": model,
+            "messages": [["role": "user", "content": prompt]],
+            "response_format": ["type": "json_object"],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AIError.badResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let text = String(data: data, encoding: .utf8) ?? ""
+            throw AIError.apiError("DeepSeek API error \(http.statusCode): \(text.prefix(300))")
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AIError.badResponse
