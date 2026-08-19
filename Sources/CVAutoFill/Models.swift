@@ -104,6 +104,24 @@ struct AboutMeNote: Codable, Identifiable, Equatable {
     }
 }
 
+// A reusable, named instruction block for the Ask AI chat — pick it up with
+// the # button there instead of retyping it. Matches the browser
+// extension's Options -> Ask AI -> Saved tasks.
+struct AskPreset: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var label: String = ""
+    var prompt: String = ""
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        prompt = try c.decodeIfPresent(String.self, forKey: .prompt) ?? ""
+    }
+}
+
 struct JobItem: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var title: String = ""
@@ -125,6 +143,54 @@ struct JobItem: Codable, Identifiable, Equatable {
         requirements = try c.decodeIfPresent(String.self, forKey: .requirements) ?? ""
         link = try c.decodeIfPresent(String.self, forKey: .link) ?? ""
         results = try c.decodeIfPresent(String.self, forKey: .results) ?? ""
+        addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
+    }
+}
+
+struct ConferenceItem: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var name: String = ""
+    var link: String = ""
+    var deadline: String = "" // free text, e.g. "2026-03-01" or "Rolling" — not a Date
+    var location: String = ""
+    var status: String = "" // free text, e.g. "Planning to submit" / "Submitted" / "Accepted"
+    var notes: String = ""
+    var addedAt: Date = Date()
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        link = try c.decodeIfPresent(String.self, forKey: .link) ?? ""
+        deadline = try c.decodeIfPresent(String.self, forKey: .deadline) ?? ""
+        location = try c.decodeIfPresent(String.self, forKey: .location) ?? ""
+        status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
+    }
+}
+
+struct JournalItem: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var name: String = "" // short name / abbreviation, e.g. "IEEE TPAMI"
+    var fullName: String = "" // full journal name, e.g. "IEEE Transactions on Pattern Analysis and Machine Intelligence"
+    var link: String = ""
+    var status: String = ""
+    var notes: String = ""
+    var addedAt: Date = Date()
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        fullName = try c.decodeIfPresent(String.self, forKey: .fullName) ?? ""
+        link = try c.decodeIfPresent(String.self, forKey: .link) ?? ""
+        status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
     }
 }
@@ -196,9 +262,13 @@ struct AppSettings: Codable, Equatable {
     // one step further (there, a task picks only the provider and follows
     // that provider's own single model; here each task also picks its own
     // model).
-    var other: TaskProviderChoice = TaskProviderChoice() // Ask AI + Parse CV
+    var other: TaskProviderChoice = TaskProviderChoice() // Parse CV
     var tailorCv: TaskProviderChoice = TaskProviderChoice()
     var coverLetter: TaskProviderChoice = TaskProviderChoice()
+    // Ask AI has its own dedicated task, set inline at the top of the Ask AI
+    // page itself rather than here in Settings — kept in AppSettings anyway
+    // since it needs the same persistence/backup treatment as the others.
+    var ask: TaskProviderChoice = TaskProviderChoice()
 
     var appearanceMode: AppearanceMode = .system
     var accentColorHex: String = "#27A6F5"
@@ -219,6 +289,7 @@ struct AppSettings: Codable, Equatable {
         other = try c.decodeIfPresent(TaskProviderChoice.self, forKey: .other) ?? TaskProviderChoice()
         tailorCv = try c.decodeIfPresent(TaskProviderChoice.self, forKey: .tailorCv) ?? TaskProviderChoice()
         coverLetter = try c.decodeIfPresent(TaskProviderChoice.self, forKey: .coverLetter) ?? TaskProviderChoice()
+        ask = try c.decodeIfPresent(TaskProviderChoice.self, forKey: .ask) ?? TaskProviderChoice()
         appearanceMode = try c.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? .system
         accentColorHex = try c.decodeIfPresent(String.self, forKey: .accentColorHex) ?? "#27A6F5"
         menuTextColorHex = try c.decodeIfPresent(String.self, forKey: .menuTextColorHex) ?? "#FFFFFF"

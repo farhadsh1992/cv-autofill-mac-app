@@ -9,6 +9,9 @@ final class AppState: ObservableObject {
     @Published var aboutMeNotes: [AboutMeNote]
     @Published var resources: [ResourceItem]
     @Published var jobs: [JobItem]
+    @Published var conferences: [ConferenceItem]
+    @Published var journals: [JournalItem]
+    @Published var askPresets: [AskPreset]
     @Published var openaiApiKey: String
     @Published var anthropicApiKey: String
     @Published var kimiApiKey: String
@@ -31,6 +34,9 @@ final class AppState: ObservableObject {
         aboutMeNotes = Storage.loadJSON([AboutMeNote].self, from: "about-me-notes.json") ?? []
         resources = Storage.loadJSON([ResourceItem].self, from: "resources.json") ?? []
         jobs = Storage.loadJSON([JobItem].self, from: "jobs.json") ?? []
+        conferences = Storage.loadJSON([ConferenceItem].self, from: "conferences.json") ?? []
+        journals = Storage.loadJSON([JournalItem].self, from: "journals.json") ?? []
+        askPresets = Storage.loadJSON([AskPreset].self, from: "ask-presets.json") ?? []
         openaiApiKey = Keychain.get(forKey: "openaiApiKey") ?? ""
         anthropicApiKey = Keychain.get(forKey: "anthropicApiKey") ?? ""
         kimiApiKey = Keychain.get(forKey: "kimiApiKey") ?? ""
@@ -130,6 +136,9 @@ final class AppState: ObservableObject {
     func saveAboutMeNotes() { Storage.saveJSON(aboutMeNotes, to: "about-me-notes.json") }
     func saveResources() { Storage.saveJSON(resources, to: "resources.json") }
     func saveJobs() { Storage.saveJSON(jobs, to: "jobs.json") }
+    func saveConferences() { Storage.saveJSON(conferences, to: "conferences.json") }
+    func saveJournals() { Storage.saveJSON(journals, to: "journals.json") }
+    func saveAskPresets() { Storage.saveJSON(askPresets, to: "ask-presets.json") }
     func savePromptOverrides() { Storage.saveJSON(promptOverrides, to: "prompts.json") }
 
     func contextBlock() -> String {
@@ -168,8 +177,8 @@ final class AppState: ObservableObject {
     }
 
     /// Convenience for call sites that don't offer a per-action picker
-    /// (CV parsing, cover letter PDF text extraction, Ask AI) — uses the
-    /// "Other" task's provider+model from Settings → AI.
+    /// (CV parsing, cover letter PDF text extraction) — uses the "Other"
+    /// task's provider+model from Settings → AI.
     var defaultAIClient: AIClient {
         aiClient(provider: settings.other.provider, model: settings.other.model)
     }
@@ -180,6 +189,12 @@ final class AppState: ObservableObject {
 
     var coverLetterAIClient: AIClient {
         aiClient(provider: settings.coverLetter.provider, model: settings.coverLetter.model)
+    }
+
+    /// Ask AI's own provider+model, set inline at the top of the Ask AI page
+    /// itself rather than in Settings.
+    var askAIClient: AIClient {
+        aiClient(provider: settings.ask.provider, model: settings.ask.model)
     }
 
     func recordUsage(provider: Provider, model: String, input: Int, output: Int) {

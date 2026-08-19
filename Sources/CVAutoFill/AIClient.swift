@@ -346,23 +346,48 @@ struct AIClient {
         return try decodeCV(from: json)
     }
 
-    func ask(question: String, cvData: CVData?, context: String, promptOverride: String? = nil) async throws -> String {
+    /// `history` is the chat's prior turns — sent fresh on every call since
+    /// these are stateless HTTP APIs with no server-side memory between
+    /// requests. `presetPrompt` is a saved task's instructions (Ask AI's #
+    /// button), layered on top of the base ask prompt. `attachedFileText` is
+    /// a file's text, already extracted locally (PDFKit for .pdf, the same
+    /// way CVs are parsed — this app never sends raw PDF bytes to the AI).
+    func ask(
+        question: String, cvData: CVData?, context: String,
+        history: [AskHistoryEntry] = [], presetPrompt: String? = nil,
+        attachedFileName: String? = nil, attachedFileText: String? = nil,
+        promptOverride: String? = nil
+    ) async throws -> String {
         guard !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AIError.apiError("Type a question first.")
         }
         let instructions = promptOverride ?? Prompts.ask
+        let historyBlock = history.map { "\($0.role == .user ? "APPLICANT" : "YOU"): \($0.content)" }.joined(separator: "\n\n")
+        let trimmedPreset = presetPrompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let taskBlock = trimmedPreset.isEmpty ? "" : "\nTASK_INSTRUCTIONS (apply these for this conversation):\n\(trimmedPreset)\n"
+        let trimmedAttachment = attachedFileText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let attachedBlock = trimmedAttachment.isEmpty ? "" : "\nATTACHED_FILE (\(attachedFileName ?? "file")):\n\(trimmedAttachment)\n"
         let prompt = """
         \(instructions)
-
+        \(taskBlock)\(attachedBlock)
         \(context)
 
         CV_DATA:
         \(try jsonString(cvData ?? CVData()))
 
-        QUESTION:
+        CONVERSATION_SO_FAR:
+        \(historyBlock.isEmpty ? "(none — this is the first message)" : historyBlock)
+
+        NEW_QUESTION:
         \(question)
         """
         let json = try await call(text: prompt)
         return (json["answer"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
+
+struct AskHistoryEntry {
+    enum Role { case user, ai }
+    let role: Role
+    let content: String
 }

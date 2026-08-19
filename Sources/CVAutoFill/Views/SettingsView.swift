@@ -3,6 +3,7 @@ import SwiftUI
 enum SettingsTab: String, CaseIterable, Identifiable {
     case appearance = "Appearance"
     case ai = "AI"
+    case askAI = "Ask AI"
     case backup = "Backup"
 
     var id: String { rawValue }
@@ -17,6 +18,12 @@ struct SettingsView: View {
     @State private var backupIsError = false
     @State private var showClaudeCodeSetup = false
     @State private var showCodexSetup = false
+
+    @State private var presetLabel = ""
+    @State private var presetPrompt = ""
+    @State private var editingPresetId: UUID?
+    @State private var presetStatus = ""
+    @State private var presetIsError = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,6 +40,7 @@ struct SettingsView: View {
                 switch tab {
                 case .appearance: appearanceSection
                 case .ai: aiSection
+                case .askAI: askAISection
                 case .backup: backupSection
                 }
             }
@@ -112,8 +120,8 @@ struct SettingsView: View {
 
             taskPicker(title: "Rebuild / tailor CV", choice: $state.settings.tailorCv)
             taskPicker(title: "Rebuild / write cover letter", choice: $state.settings.coverLetter)
-            taskPicker(title: "Other", choice: $state.settings.other)
-            Text("\"Other\" covers Ask AI and CV parsing.")
+            taskPicker(title: "CV parsing", choice: $state.settings.other)
+            Text("Ask AI has its own provider/model picker at the top of the Ask AI page — see the Ask AI tab above for its saved tasks.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         } header: {
@@ -239,6 +247,112 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
+    private var askAISection: some View {
+        Section {
+            Text("Reusable instructions for the Ask AI chat — write one once, give it a label, then pull it back up with the # button in the chat window instead of retyping it. Once selected, a task's instructions apply to every message in that chat until you clear it or pick a different one. Ask AI's own provider/model picker lives at the top of the Ask AI page, not here.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Text(editingPresetId == nil ? "Add a task" : "Editing \"\(presetLabel.isEmpty ? "Task" : presetLabel)\"")
+                .font(.subheadline.weight(.medium))
+            TextField("Label — e.g. Interview prep", text: $presetLabel)
+            TextEditor(text: $presetPrompt)
+                .frame(minHeight: 80)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+            HStack {
+                Button(editingPresetId == nil ? "Add task" : "Save changes") { savePreset() }
+                if editingPresetId != nil {
+                    Button("Cancel", role: .cancel) {
+                        cancelEditingPreset()
+                        presetStatus = ""
+                    }
+                }
+                if !presetStatus.isEmpty { Text(presetStatus).foregroundStyle(presetIsError ? .red : .secondary) }
+            }
+        } header: {
+            Text("Ask AI — Saved tasks").font(.headline)
+        }
+
+        Section {
+            if state.askPresets.isEmpty {
+                Text("No saved tasks yet.").foregroundStyle(.secondary)
+            } else {
+                ForEach(state.askPresets) { preset in
+                    presetRow(preset)
+                }
+            }
+        }
+    }
+
+    private func presetRow(_ preset: AskPreset) -> some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(preset.prompt)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                HStack {
+                    Button("Edit") { startEditingPreset(preset) }
+                    Button("Remove", role: .destructive) { removePreset(preset) }
+                }
+            }
+            .padding(.top, 4)
+        } label: {
+            Text(preset.label.isEmpty ? "Task" : preset.label).bold()
+        }
+    }
+
+    private func startEditingPreset(_ preset: AskPreset) {
+        editingPresetId = preset.id
+        presetLabel = preset.label
+        presetPrompt = preset.prompt
+        presetStatus = ""
+    }
+
+    private func cancelEditingPreset() {
+        editingPresetId = nil
+        presetLabel = ""
+        presetPrompt = ""
+    }
+
+    private func savePreset() {
+        let label = presetLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prompt = presetPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty else {
+            presetStatus = "Give it a label first."
+            presetIsError = true
+            return
+        }
+        guard !prompt.isEmpty else {
+            presetStatus = "Write the instructions first."
+            presetIsError = true
+            return
+        }
+        let wasEditing = editingPresetId != nil
+        if let editingPresetId, let index = state.askPresets.firstIndex(where: { $0.id == editingPresetId }) {
+            state.askPresets[index].label = label
+            state.askPresets[index].prompt = prompt
+        } else {
+            var preset = AskPreset()
+            preset.label = label
+            preset.prompt = prompt
+            state.askPresets.append(preset)
+        }
+        state.saveAskPresets()
+        cancelEditingPreset()
+        presetStatus = wasEditing ? "Task updated." : "Task added."
+        presetIsError = false
+    }
+
+    private func removePreset(_ preset: AskPreset) {
+        state.askPresets.removeAll { $0.id == preset.id }
+        state.saveAskPresets()
+        if editingPresetId == preset.id {
+            cancelEditingPreset()
+            presetStatus = ""
+        }
+    }
+
+    @ViewBuilder
     private func taskPicker(title: String, choice: Binding<TaskProviderChoice>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.subheadline.weight(.medium))
@@ -261,6 +375,10 @@ struct SettingsView: View {
                 }
                 .labelsHidden()
                 .frame(minWidth: 220)
+
+                TextField("or type a custom model ID", text: choice.model)
+                    .labelsHidden()
+                    .frame(minWidth: 140, maxWidth: 220)
             }
         }
         .padding(.vertical, 2)

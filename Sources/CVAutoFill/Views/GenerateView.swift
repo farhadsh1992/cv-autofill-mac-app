@@ -47,6 +47,7 @@ struct GenerateView: View {
                     HStack {
                         Button("Copy") { copyToClipboard(coverLetterDraft) }
                         Button("Export as PDF") { exportCoverLetterPDF() }
+                        Button("Export as Word") { exportCoverLetterDocx() }
                     }
                 }
 
@@ -100,6 +101,12 @@ struct GenerateView: View {
     private func exportCoverLetterPDF() {
         let data = PDFExporter.makePDF(text: coverLetterDraft)
         let name = "\(safeName(state.cvData?.full_name ?? "Cover_Letter"))_Cover_Letter.pdf"
+        saveWithPanel(data: data, suggestedName: name)
+    }
+
+    private func exportCoverLetterDocx() {
+        let data = DocxWriter.generateCoverLetter(coverLetterDraft)
+        let name = "\(safeName(state.cvData?.full_name ?? "Cover_Letter"))_Cover_Letter.docx"
         saveWithPanel(data: data, suggestedName: name)
     }
 

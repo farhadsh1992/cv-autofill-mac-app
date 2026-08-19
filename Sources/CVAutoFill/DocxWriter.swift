@@ -257,6 +257,47 @@ enum DocxWriter {
         return buildZip(entries)
     }
 
+    // ---- Plain paragraph doc (used for the cover letter export) ----
+
+    /// text: the cover letter body, blank-line-separated paragraphs (AI
+    /// output already comes this way). A single newline within a paragraph
+    /// is treated as a soft wrap and joined with a space, not a new paragraph.
+    static func generateCoverLetter(_ text: String) -> Data {
+        let blocks = text.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n\n")
+        let nonEmptyBlocks = blocks.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        var paragraphs = nonEmptyBlocks.enumerated().map { i, block -> String in
+            let joined = block.components(separatedBy: "\n").joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            return paragraph([Run(text: joined)], spacingAfter: i == nonEmptyBlocks.count - 1 ? nil : 200)
+        }
+        if paragraphs.isEmpty { paragraphs.append(paragraph([])) }
+
+        let sectPr = "<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\"/></w:sectPr>"
+
+        let documentXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">" +
+            "<w:body>\(paragraphs.joined())\(sectPr)</w:body></w:document>"
+
+        let contentTypesXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+            "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+            "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+            "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
+            "</Types>"
+
+        let packageRelsXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+            "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>" +
+            "</Relationships>"
+
+        let entries = [
+            Entry(name: "[Content_Types].xml", data: Array(contentTypesXml.utf8)),
+            Entry(name: "_rels/.rels", data: Array(packageRelsXml.utf8)),
+            Entry(name: "word/document.xml", data: Array(documentXml.utf8)),
+        ]
+
+        return buildZip(entries)
+    }
+
     // ---- Simple bordered table doc (used for the "applied jobs" export) ----
 
     private static func tableCell(_ text: String, widthDxa: Int, bold: Bool = false) -> String {
@@ -331,5 +372,64 @@ enum DocxWriter {
         ]
 
         return buildZip(entries)
+    }
+
+    // ---- Landscape table docs for the Academic (Conferences/Journals) tabs ----
+
+    /// Shared by generateConferences/generateJournals — same landscape-table
+    /// shape as generateJobs, just with a different title/headers/rows/widths.
+    private static func generateLandscapeTable(title: String, headers: [String], rows: [[String]], widths: [Int]) -> Data {
+        let paragraphs = [
+            paragraph([Run(text: title, bold: true, size: 32)], spacingAfter: 200),
+            table(headers: headers, rows: rows, widths: widths),
+            // OOXML requires a paragraph after a table that's the last block in the body.
+            paragraph([]),
+        ]
+
+        let sectPr = "<w:sectPr><w:pgSz w:w=\"15840\" w:h=\"12240\" w:orient=\"landscape\"/>" +
+            "<w:pgMar w:top=\"1080\" w:right=\"1080\" w:bottom=\"1080\" w:left=\"1080\"/></w:sectPr>"
+
+        let documentXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">" +
+            "<w:body>\(paragraphs.joined())\(sectPr)</w:body></w:document>"
+
+        let contentTypesXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+            "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+            "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+            "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
+            "</Types>"
+
+        let packageRelsXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+            "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>" +
+            "</Relationships>"
+
+        let entries = [
+            Entry(name: "[Content_Types].xml", data: Array(contentTypesXml.utf8)),
+            Entry(name: "_rels/.rels", data: Array(packageRelsXml.utf8)),
+            Entry(name: "word/document.xml", data: Array(documentXml.utf8)),
+        ]
+
+        return buildZip(entries)
+    }
+
+    static func generateConferences(_ conferences: [ConferenceItem]) -> Data {
+        let headers = ["Name", "Deadline", "Location", "Status", "Link", "Notes"]
+        // dxa (twentieths of a point); landscape letter minus 1" margins each side = 13680 dxa available.
+        let widths = [2400, 1600, 1800, 1800, 2180, 3900]
+        let rows = conferences.map {
+            [$0.name, $0.deadline, $0.location, $0.status, $0.link, $0.notes]
+        }
+        return generateLandscapeTable(title: "Conferences", headers: headers, rows: rows, widths: widths)
+    }
+
+    static func generateJournals(_ journals: [JournalItem]) -> Data {
+        let headers = ["Name", "Full name", "Status", "Link", "Notes", "Date"]
+        let widths = [1800, 3200, 1600, 2180, 3200, 1700]
+        let rows = journals.map {
+            [$0.name, $0.fullName, $0.status, $0.link, $0.notes, jobDateFormatter.string(from: $0.addedAt)]
+        }
+        return generateLandscapeTable(title: "Journals", headers: headers, rows: rows, widths: widths)
     }
 }

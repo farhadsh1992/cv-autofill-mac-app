@@ -18,10 +18,22 @@ why, and how to move data between them manually if you want to).
 
 - **Generate** — paste a job description, pick a provider/model, and get a
   cover letter draft (editable, copyable, exportable as a real PDF via
-  native CoreText) or a tailored CV (re-emphasizes your real CV content for
-  that job, downloads as a real `.docx` — never invents facts).
-- **Ask AI** — a quick, CV-grounded question box for when you're stuck on an
-  application question your CV doesn't obviously answer.
+  native CoreText or as a real `.docx`) or a tailored CV (re-emphasizes your
+  real CV content for that job, downloads as a real `.docx` — never invents
+  facts). Cover letters are written to fill roughly one full page, with no
+  contact info repeated at the end.
+- **Ask AI** — a full chat, not a single question box: multi-turn history is
+  sent with every message, each AI answer has a copy button, and the app
+  logo sits as a faint watermark behind the messages (no header text). Its
+  own provider/model picker lives at the top of the page, independent of
+  the AI tab's other tasks. The **#** button opens saved tasks — reusable
+  instructions with a label, managed (add/edit/remove) in **Settings → Ask
+  AI**, applied to every message in the chat until cleared or swapped. The
+  paperclip button attaches a PDF/Word/.txt file — extracted locally
+  (PDFKit/`NSAttributedString`, same as CV parsing; this app never sends raw
+  file bytes to the AI) and saved as a permanent About Me note the moment
+  it's attached, so it's remembered for every future question — and every
+  other AI task — without re-attaching it again.
 - **CV** — upload a PDF or Word `.docx` (extracted locally via PDFKit /
   `NSAttributedString`, no API call needed just to read the file), or paste
   text; parsed into structured JSON by AI, editable directly. If the
@@ -81,16 +93,23 @@ set separately, per task, at the top of Settings → AI:
 - **Rebuild / tailor CV** — used by Generate's "Generate tailored CV" button.
 - **Rebuild / write cover letter** — used by Generate's "Generate cover
   letter" button.
-- **Other** — Ask AI and CV parsing.
+- **CV parsing** — used when you upload or paste a CV.
 
-Each of the three has its own provider *and* model picker, independent of
-the other two — you can, for example, tailor your CV with
+(Ask AI has its own separate provider/model picker at the top of the Ask AI
+page itself, not here — see below.)
+
+Each of these has its own provider *and* model picker, independent of
+the others — you can, for example, tailor your CV with
 `claude-opus-5` while writing cover letters with `gpt-4o-mini`, or run both
 through the same provider but different models. (Unlike the browser
 extension, this app never sends a PDF to the AI at all — CVs and cover
 letters are extracted locally via PDFKit first — so Kimi's and DeepSeek's
 lack of PDF support, a real limitation on the extension side, doesn't apply
-here.)
+here.) OpenAI's model dropdown includes the GPT-5.6 family
+(`gpt-5.6-sol`/`gpt-5.6-terra`/`gpt-5.6-luna`) alongside gpt-4o/gpt-4.1.
+Every model picker also has a plain text field next to it, so you can type
+a custom model ID directly if a provider ships something newer than
+whatever's hardcoded in the dropdown.
 
 **DeepSeek** is an open-weight model, but the API this app calls is not
 free — it's billed per token, same as the other three HTTP providers above,

@@ -30,7 +30,7 @@ enum Prompts {
     - REFERENCE_COVER_LETTER: a cover letter the applicant has written before. Use it only as a guide for their voice, tone, and typical structure — do not copy it verbatim, and do not reuse specifics (company names, roles) from it. Write a new letter tailored to JOB_CONTEXT.
     - JOB_CONTEXT: text the applicant pasted from a job posting. It may be incomplete, noisy, or missing.
 
-    Write a new cover letter grounded only in facts from CV_DATA — never invent employers, dates, skills, or achievements that aren't in CV_DATA. Keep it concise (250-400 words), professional, and specific to the role in JOB_CONTEXT where the context allows it. If JOB_CONTEXT is missing or unhelpful, write a solid general-purpose letter from CV_DATA instead of inventing job details.
+    Write a new cover letter grounded only in facts from CV_DATA — never invent employers, dates, skills, or achievements that aren't in CV_DATA. Write enough to fill roughly one full page (about 380-450 words) — a complete, substantial letter, not a short note — professional, and specific to the role in JOB_CONTEXT where the context allows it. If JOB_CONTEXT is missing or unhelpful, write a solid general-purpose letter from CV_DATA instead of inventing job details. End with a simple signature line (e.g. "Sincerely," followed by the applicant's name) — do not repeat their email, phone number, or address anywhere in the letter; that contact information belongs on the CV, not restated here.
 
     Respond as JSON: {"cover_letter": "..."}. Respond with JSON only — no markdown code fences, no commentary.
     """
@@ -64,10 +64,10 @@ enum Prompts {
     """
 
     static let ask = """
-    You are helping a job applicant who is filling out a job application and got stuck on a question.
-    You are given CV_DATA, ABOUT_ME, ADDITIONAL_RESOURCES, and the applicant's QUESTION.
+    You are chatting with a job applicant who is filling out a job application and got stuck on something.
+    You are given CV_DATA, ABOUT_ME, ADDITIONAL_RESOURCES, CONVERSATION_SO_FAR (the chat so far, if any), and the applicant's NEW_QUESTION. TASK_INSTRUCTIONS and ATTACHED_FILE, if present, are extra context the applicant added for this conversation.
 
-    Answer the question directly and concisely, grounded only in the given information. If you don't have enough information to answer factually, say so plainly rather than guessing or inventing facts — the applicant will fill in the real answer themselves.
+    Answer NEW_QUESTION directly and concisely, grounded only in the given information — treat CONVERSATION_SO_FAR as context for follow-ups ("what about the one before that?"), not something to re-answer. If you don't have enough information to answer factually, say so plainly rather than guessing or inventing facts — the applicant will fill in the real answer themselves.
 
     Respond as JSON: {"answer": "..."}. Respond with JSON only — no markdown code fences, no commentary.
     """

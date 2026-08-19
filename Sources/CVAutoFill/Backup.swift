@@ -25,7 +25,7 @@ enum Backup {
     // the catalog's first model if none of them do.
     @MainActor
     private static func modelForExport(_ provider: Provider, state: AppState) -> String {
-        for choice in [state.settings.other, state.settings.tailorCv, state.settings.coverLetter] where choice.provider == provider {
+        for choice in [state.settings.other, state.settings.tailorCv, state.settings.coverLetter, state.settings.ask] where choice.provider == provider {
             return choice.model
         }
         return ModelCatalog.models(for: provider).first ?? ""
@@ -64,7 +64,14 @@ enum Backup {
             "other": ["provider": state.settings.other.provider.rawValue, "model": state.settings.other.model],
             "tailorCv": ["provider": state.settings.tailorCv.provider.rawValue, "model": state.settings.tailorCv.model],
             "coverLetter": ["provider": state.settings.coverLetter.provider.rawValue, "model": state.settings.coverLetter.model],
+            "ask": ["provider": state.settings.ask.provider.rawValue, "model": state.settings.ask.model],
         ]
+
+        // Same shape as the browser extension's Options → Ask AI → Saved
+        // tasks ({id, label, prompt}) — round-trips either direction.
+        dict["askAIPresets"] = state.askPresets.map { p -> [String: Any] in
+            ["id": p.id.uuidString, "label": p.label, "prompt": p.prompt]
+        }
 
         if let cv = state.cvData,
            let cvData = try? JSONEncoder().encode(cv),
@@ -186,6 +193,7 @@ enum Backup {
             if let c = choice("other") { state.settings.other = c }
             if let c = choice("tailorCv") { state.settings.tailorCv = c }
             if let c = choice("coverLetter") { state.settings.coverLetter = c }
+            if let c = choice("ask") { state.settings.ask = c }
             result.imported.append("AI task settings")
         } else {
             if let activeProvider = dict["activeProvider"] as? String, let p = Provider(rawValue: activeProvider) {
@@ -242,6 +250,17 @@ enum Backup {
             result.imported.append("About me notes")
         }
 
+        if let presets = dict["askAIPresets"] as? [[String: Any]] {
+            state.askPresets = presets.map { o in
+                var preset = AskPreset()
+                preset.id = (o["id"] as? String).flatMap { UUID(uuidString: $0) } ?? UUID()
+                preset.label = o["label"] as? String ?? ""
+                preset.prompt = o["prompt"] as? String ?? ""
+                return preset
+            }
+            result.imported.append("Ask AI saved tasks")
+        }
+
         if let addresses = dict["addresses"] as? [[String: Any]], !addresses.isEmpty {
             result.skipped.append("Addresses (not supported in this app)")
         }
@@ -287,6 +306,7 @@ enum Backup {
         state.saveAboutMeNotes()
         state.saveResources()
         state.saveJobs()
+        state.saveAskPresets()
         state.savePromptOverrides()
 
         return result

@@ -65,7 +65,7 @@ struct UsageEntry: Identifiable {
 }
 
 enum ModelCatalog {
-    static let openai = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
+    static let openai = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
     static let anthropic = ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"]
     static let kimi = ["kimi-k2.5", "kimi-k3"]
     static let gemini = ["gemini-3.5-flash", "gemini-3.1-pro"]
@@ -94,6 +94,9 @@ enum ModelCatalog {
     static func displayName(_ model: String) -> String {
         switch model {
         case "gpt-4o-mini": return "gpt-4o-mini (fastest/cheapest)"
+        case "gpt-5.6-sol": return "gpt-5.6-sol (flagship)"
+        case "gpt-5.6-terra": return "gpt-5.6-terra (balanced)"
+        case "gpt-5.6-luna": return "gpt-5.6-luna (fast/cheap)"
         case "claude-sonnet-5": return "claude-sonnet-5 (balanced)"
         case "claude-opus-5": return "claude-opus-5 (most capable)"
         case "claude-haiku-4-5-20251001": return "claude-haiku-4-5 (fastest/cheapest)"
